@@ -1,0 +1,294 @@
+# @zenland-dev/n8n-nodes-bitrix24
+
+n8n community nodes for [Bitrix24](https://www.bitrix24.com): a CRM node with 268 operations
+across 42 resources, a node that calls any of the ~1400 REST methods by name or in batches,
+and a trigger for outgoing webhooks.
+
+Written from scratch against the official REST documentation
+([bitrix24/b24restdocs](https://github.com/bitrix24/b24restdocs), read on 14.09.2026). No code
+from any other package.
+
+**Status: 0.1.0.** Every one of the 277 operations was run on a live production portal:
+reads as they are, writes on throwaway pipelines and records the test created and deleted.
+17 of them work with a limitation of Bitrix24 itself, listed under
+[Quirks](#quirks-worth-knowing). See [What was checked](#what-was-checked).
+
+- [Installation](#installation)
+- [Credentials](#credentials)
+- [Bitrix24 node](#bitrix24-node)
+- [Bitrix24 CRM](#bitrix24-crm)
+- [Bitrix24 Trigger](#bitrix24-trigger)
+- [Rate limits](#rate-limits)
+- [Quirks worth knowing](#quirks-worth-knowing)
+- [What was checked](#what-was-checked)
+- [What is not here yet](#what-is-not-here-yet)
+
+## Installation
+
+In n8n: **Settings → Community nodes → Install**, then enter `@zenland-dev/n8n-nodes-bitrix24`.
+
+Self-hosted, from the command line:
+
+```bash
+npm install @zenland-dev/n8n-nodes-bitrix24
+```
+
+Requires n8n 2.x and Node 20.19 or newer.
+
+## Credentials
+
+All three nodes use **Bitrix24 Webhook API**, built from an inbound webhook.
+
+Create the webhook in Bitrix24 under **Developer resources → Other → Inbound webhook** and tick
+the permissions the workflows need: `crm` for the CRM node, plus whatever modules you call
+through the Bitrix24 node. The webhook acts as the user who created it and sees only what that
+user may see, so a webhook made by a sales manager cannot read another manager's deals.
+
+The credential has three fields instead of one URL.
+
+**Portal Subdomain** and **Portal Domain.** `mycompany` and `bitrix24.com` for
+`mycompany.bitrix24.com`. The domain is a closed list of the 23 zones Bitrix24 serves cloud
+portals on (`.com`, `.eu`, `.de`, `.ru`, `.kz`, `.com.br` and so on). A webhook URL carries
+its secret in the path, so a free-form address would let anyone who can edit the credential
+send that secret to their own server. The list is enforced again inside the nodes, not only in
+the dropdown. Self-hosted Bitrix24 on its own domain is not supported for the same reason.
+
+The zones were found by resolving a random subdomain in each candidate: Bitrix24 zones answer
+with wildcard DNS, `.ua`, `.am`, `.az`, `.ge` and `.kg` do not resolve, and `.cz` and `.au`
+resolve to parking pages that have nothing to do with Bitrix24.
+
+**Webhook Token.** The part of the webhook URL after `/rest/`, like `1/abcdef0123456789`.
+Pasting the whole URL works: only the tail is kept, and the host in it is ignored.
+
+**Requests per Second** defaults to 2, the limit on every plan below Enterprise.
+
+The credential is pinned out of the HTTP Request node (`Allowed HTTP Request Domains` is fixed
+to none), and it has no `authenticate` block, so even a credential selected there would add
+nothing to a request.
+
+## Bitrix24 node
+
+The escape hatch. Anything the CRM node lacks, and every module that has no node yet, is one
+call away here.
+
+| Resource | Operations |
+|---|---|
+| **Method** | Call |
+| **Batch** | Execute Commands, Call for Each Item |
+| **Portal** | Get Permissions, Get Methods, Check Method, Get Current User, Get Server Time, Get Access Names |
+
+**Call** takes a method name and a JSON body, for example `crm.item.list` with
+`{"entityTypeId": 2, "select": ["title", "stageId"]}`. Pagination has three modes. *First
+Page Only* sends one request. *Follow Pages* repeats with `start` until Bitrix24 stops
+sending `next`. *Page by ID* filters by the last ID received with `start: -1`, which tells
+Bitrix24 not to count the total. On the portal these nodes were tested on, a first page with
+the count took 1.7 s and without it a fraction of that, for the same 50 deals.
+
+**API Version** switches to REST 3.0 (`/rest/api/`). Some newer methods exist only there:
+`main.eventlog.*`, `mail.mailbox.*`, `note.*`, `humanresources.*`, `timeman.record.*`.
+
+**Execute Commands** sends up to 50 named calls in one request, and a later command can use an
+earlier result: `{"id": "$result[list][items][0][id]"}`. Such references only work inside one
+request, which is why the node refuses a 51st command instead of splitting the list.
+
+**Call for Each Item** is for bulk work. It makes the same kind of call once per input item and
+packs them 50 to a request, so 500 new leads cost 10 requests instead of 500. Output items stay
+paired with their inputs. With Continue On Fail on, a failed call becomes an error item and the
+rest go through; with it off, the node stops, but every call of that run has already been sent.
+
+## Bitrix24 CRM
+
+Built on the universal `crm.item.*` API, so field names are camelCase (`title`, `stageId`,
+`assignedById`) and custom fields are `ufCrm…`. The older per-entity methods (`crm.deal.add`
+and friends) are frozen by Bitrix24 and are not wrapped; call them through the Bitrix24 node if
+an old integration needs their exact behaviour.
+
+| Resource | Operations |
+|---|---|
+| **Lead, Deal, Contact, Company, Quote, Invoice** | Create, Get, Get Many, Update, Delete, Get Fields, Import, Merge |
+| **Smart Process Item** | the same, for any smart process picked from a list |
+| **Product Row** | Add, Get, Get Many, Update, Replace All, Delete, Get Fields, Get Available for Payment |
+| **Activity** | Create To-Do, Update To-Do, Set Deadline, Set Description, Set Responsible, Set Color, Complete, Get, Get Many, Delete, Get Fields, Get Call Transcript, Link to Record, Unlink From Record, Get Links, Move |
+| **Timeline Comment** | Create, Get, Get Many, Update, Delete |
+| **Timeline Note** | Save, Get, Delete |
+| **Timeline Log Entry** | Create, Get, Get Many, Delete |
+| **Timeline Entry** | Link to Record, Unlink From Record, Get Links, Pin, Unpin |
+| **Linked Contact** | Add, Remove, Get Many, Replace All, Remove All (on leads, deals, quotes, companies) |
+| **Linked Company** | the same, on contacts |
+| **Duplicate** | Find by Phone or Email, Get Extra Search Fields, Get Addable Search Fields, Add Search Field, Remove Search Field |
+| **Pipeline** | Create, Get, Get Many, Update, Delete, Get Fields |
+| **Reference Book** | Create, Get, Get Many, Update, Delete, Get Fields, Get Reference Books, Get Book Entries |
+| **Smart Process Type** | Create, Get, Get Many, Update, Delete, Get Fields, Get by Entity Type ID |
+| **Custom Field** | Create, Get, Get Many, Update, Delete (leads, deals, contacts, companies, quotes, requisites) |
+| **Custom Field Config** | Create, Get, Get Many, Update, Delete, Get Field Types (any CRM type, smart processes included) |
+| **Requisite, Bank Detail** | Create, Get, Get Many, Update, Delete, Get Fields |
+| **Address** | Create, Get Many, Update, Delete, Get Fields |
+| **Requisite Link** | Get, Get Many, Set, Remove, Get Fields |
+| **Requisite Template, Requisite Template Field** | Create, Get, Get Many, Update, Delete, Get Fields (+ Get Available to Add) |
+| **Document** | Generate, Get, Get Many, Update, Delete, Set Public Link, Get Placeholders, Upload |
+| **Document Template, Document Numerator** | Create, Get, Get Many, Update, Delete |
+| **Payment** | Create, Get, Get Many, Update, Delete, Mark as Paid, Mark as Unpaid, Get Payment Link, and products and deliveries inside a payment |
+| **Delivery** | Get, Get Many |
+| **Recurring Deal** | Create, Get, Get Many, Update, Delete, Get Fields, Create Deal Now |
+| **Order Link** | Create, Delete, Get Many, Get Fields |
+| **Call List** | Create, Get, Get Many, Update, Get Entries, Get Statuses |
+| **Stage History** | Get Many |
+| **Automation Trigger** | Fire |
+| **Sales Intelligence Trace** | Create, Delete |
+| **Currency** | Create, Get, Get Many, Update, Delete, Get Fields, Get or Set Base Currency, Get, Set or Delete Localizations |
+| **Digital Workplace** | Create, Get, Get Many, Update, Delete, Get Fields |
+| **Card Layout** | Get, Set, Reset, Force Common for All |
+| **Dictionary** | eleven read-only lists: entity types, address types, CRM mode, custom field types and their settings |
+
+### Fields come from the portal
+
+Create, Update and Import show a field mapper filled from `crm.item.fields`. Custom fields are
+in it with their labels, list fields become dropdowns with the portal's own values, and stage
+IDs come with the pipeline in front (`Partners / Negotiation`). On the test portal a deal had
+384 fields and 170 stages across 15 pipelines, so the mapper adds nothing by default: pick the
+fields you need. Read-only fields are left out, and nothing is required on Update.
+
+Anything the mapper cannot express goes into **Fields (JSON)**, which is merged last and wins.
+Clearing a field is done there too: the mapper skips empty inputs rather than sending blanks.
+
+Leads, contacts and companies have a separate **Phones, Emails and Messengers** list. It adds
+values; changing or deleting an existing phone needs its ID, sent in `fm` through Fields (JSON).
+
+### Create runs automation, Import does not
+
+**Create** behaves like a person pressing Save: automation rules, workflows, notifications to
+the responsible user. **Import** (`crm.item.import`) creates the record without automation
+rules and workflows. Use it for tests on a portal where a new deal would send a client an SMS.
+
+The documentation also promises that Import keeps historical `createdTime`. On a live portal it
+does not: any `createdTime` older than records the portal already has, even by an hour, is
+refused with `The value of "Date created" cannot be less than that of any other items`
+(`CRM_FIELD_ERROR_VALUE_NOT_VALID`). Migrating old data with its dates needs a portal that is
+still empty.
+
+### Get Many reads by ID
+
+Get Many sorts by ID and asks for the next 50 above the last one, with no total count. Set
+**Order (JSON)** and it falls back to Bitrix24's offset paging, which counts the total on
+every page and gets slower as the portal grows.
+
+Before creating a client, **Duplicate → Find by Phone or Email** answers `found`, plus lead,
+contact and company IDs. Bitrix24 itself returns `[]` for no match and an object for a match;
+the node smooths that into one shape.
+
+## Bitrix24 Trigger
+
+Starts a workflow when Bitrix24 posts an outgoing webhook.
+
+1. In n8n, copy the trigger's **Production URL**.
+2. In Bitrix24, **Developer resources → Other → Outgoing webhook**: paste the URL, tick the
+   events, save.
+3. Copy the **Application token** Bitrix24 shows into the trigger.
+
+It has to be done by hand. The method that would subscribe the URL automatically, `event.bind`,
+answers `WRONG_AUTH_TYPE` to inbound webhooks: only an installed application may call it.
+
+Requests without the right application token get `403` and never start the workflow, and the
+token is removed from the output. The **Events** list has 181 event codes from the
+documentation; codes it lacks go into **Other Event Codes**. Events not selected are answered
+`OK` and dropped.
+
+Bitrix24 sends only IDs, for example `data.FIELDS.ID` on `ONCRMDEALUPDATE`. **Fetch the Changed
+CRM Record** reads the whole lead, deal, contact, company, quote or smart process item after an
+add or update event and puts it under `record`. If that read fails, the workflow still starts,
+with the reason in `recordError`.
+
+## Rate limits
+
+Bitrix24 has two limits, and they punish different things.
+
+**Requests per second.** 2 per second on most plans and 5 on Enterprise, as a leaky bucket
+with a burst of 50 (250 on Enterprise), counted per portal **and per source IP**. Every
+workflow on one n8n instance shares it, so the nodes queue requests per portal. Over the limit,
+Bitrix24 answers `QUERY_LIMIT_EXCEEDED` before running anything, and the node retries that
+with backoff.
+
+**Execution time.** Each method has a budget of server time per ten minutes, per webhook. The
+exact figure is set by Bitrix24 per portal; the documentation's own example uses 480 seconds. Past that, the method answers `OPERATION_TIME_LIMIT` for up to ten minutes for
+everyone using that webhook. The node does not wait that out; it fails with the reason. Heavy
+filters, `select: ["*"]` on large lists and offset paging burn this budget. A separate webhook
+per integration keeps one runaway workflow from blocking the others.
+
+## Quirks worth knowing
+
+- `methods` lists 1171 names on the test portal and misses every controller method:
+  `crm.item.*`, `tasks.task.*`, `catalog.*` are absent from it and work fine.
+- `method.get` compares in lower case and says `booking.v1.resourceType.list` does not exist,
+  though calling it works. **Check Method** lower-cases the name before asking.
+- REST 3.0 method URLs have no `.json` suffix. With it, the answer is 404.
+- The default deal pipeline has ID `0`, so pipeline operations accept 0 where other IDs must be
+  positive.
+- Custom boolean fields are filtered with `1` and `0`, though they are read and written as `Y`
+  and `N`.
+- Timeline comments want the entity type as a word (`deal`, `dynamic_1042`), product rows as a
+  short code (`D`, `T412` for smart process 1042), and most other methods as a number. The
+  nodes take the number everywhere and convert.
+- Errors with an empty `error` code are normal: method-level failures often carry only
+  `error_description`. The node shows both when there are both.
+- A timeline log entry written through a webhook cannot be deleted through one:
+  `REMOVING_DISABLED`, only the application that wrote it may. Write log entries you will want
+  to remove as comments instead.
+- Requisites attach to a deal only once the deal has its client set: otherwise
+  `Requisite with ID … can not be tied to the Deal in which the client is not selected`.
+- A pipeline can be deleted while its deleted deals still sit in the recycle bin.
+- A recurring deal template is created active even with `ACTIVE: N`. Its setting cannot be
+  deleted once a deal was made from it, even a deleted deal: `Connected recurring deal exists`.
+  Deleting the template deal removes the setting with it.
+- `crm.item.delivery.list` returned nothing for a shipment added through `sale.shipment.add`,
+  while Get by ID read it.
+- A payment updates only `paySystemId` and `paid`; anything else answers `Empty fields`.
+- A digital workplace created with `typeIds` came back with none attached.
+- A pipeline without its own card layout returns `null`: the built-in layout is not readable.
+- Call lists cannot be deleted through the API.
+- Creating or changing a lead starts the portal's lead business processes, like a person would.
+
+## What was checked
+
+On a live production portal, 14.09.2026, through a harness that runs the compiled nodes with a
+fake n8n context. Reads went through as they are. Writes went through a guard that let a write
+through only for records the same run had created and marked `[n8n-test]`, deals only inside a
+pipeline the run created, portal settings only in forms that change nothing (base currency set
+to the one already set, card layouts of the test pipeline). Everything was deleted at the end,
+and a final search found nothing marked left outside the recycle bin, except one call list:
+Bitrix24 has no method to delete those.
+
+| | Operations |
+|---|---|
+| Write, checked | 137 |
+| Read, checked | 123 |
+| Works, with a Bitrix24 limitation | 17 |
+| Not checked | 0 |
+
+The live runs found four bugs in the node, fixed before this version: `crm.currency.update`
+takes `ID` where every other currency method takes `id`; `userfieldconfig.add` and
+`update` take `field`, not `fields`; adding a product to a payment needs `quantity`; and
+a payment accepts only `paySystemId` and `paid` on update.
+
+The trigger was fed hand-made deliveries (10 checks, including a wrong token and `__proto__`
+keys) and fetched a real deal. A delivery from Bitrix24 itself needs an n8n with a public
+address. Offline, every operation runs with sample parameters, and every one of the 227 methods
+the nodes call exists in the documentation.
+
+## What is not here yet
+
+- Nodes for tasks, messenger and open channels, drive, calendar, telephony, workgroups,
+  business processes and lists, the store and catalog, sites, booking, mail and BI. Until then,
+  the Bitrix24 node calls their methods directly.
+- An OAuth2 credential for a local application, and with it everything Bitrix24 reserves for
+  applications: `event.bind`, custom automation robots, placements, open-channel connectors.
+- Timeline layout blocks, icons and logos, configurable activities and activity badges, which
+  only make sense inside an application.
+
+## Feedback and bugs
+
+[GitHub issues](https://github.com/zenland-dev/n8n-nodes-bitrix24/issues). Issues are public:
+remove the webhook token and client data from anything you paste.
+
+## License
+
+[MIT](LICENSE.md). Bitrix24 is a trademark of its owner; see the trademark note in the licence.

@@ -1,0 +1,48 @@
+{
+	"node": "@zenland-dev/n8n-nodes-bitrix24.bitrix24Crm",
+	"nodeVersion": "1.0",
+	"codexVersion": "1.0",
+	"categories": ["Sales", "Marketing & Content", "Communication"],
+	"resources": {
+		"credentialDocumentation": [
+			{
+				"url": "https://github.com/zenland-dev/n8n-nodes-bitrix24?tab=readme-ov-file#credentials"
+			}
+		],
+		"primaryDocumentation": [
+			{
+				"url": "https://github.com/zenland-dev/n8n-nodes-bitrix24?tab=readme-ov-file#bitrix24-crm"
+			}
+		]
+	},
+	"alias": [
+		"Bitrix24",
+		"Bitrix",
+		"Битрикс24",
+		"Битрикс",
+		"CRM",
+		"Deal",
+		"Сделка",
+		"Lead",
+		"Лид",
+		"Contact",
+		"Контакт",
+		"Company",
+		"Компания",
+		"Smart Process",
+		"Смарт-процесс",
+		"Pipeline",
+		"Воронка",
+		"Invoice",
+		"Счёт",
+		"Quote",
+		"Предложение",
+		"Activity",
+		"Дело",
+		"Timeline",
+		"Таймлайн",
+		"Requisites",
+		"Реквизиты",
+		"Sales"
+	]
+}
