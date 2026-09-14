@@ -1,0 +1,45 @@
+{
+	"node": "@zenland-dev/n8n-nodes-bitrix24.bitrix24Tasks",
+	"nodeVersion": "1.0",
+	"codexVersion": "1.0",
+	"categories": ["Productivity", "Communication"],
+	"resources": {
+		"credentialDocumentation": [
+			{
+				"url": "https://github.com/zenland-dev/n8n-nodes-bitrix24?tab=readme-ov-file#credentials"
+			}
+		],
+		"primaryDocumentation": [
+			{
+				"url": "https://github.com/zenland-dev/n8n-nodes-bitrix24?tab=readme-ov-file#bitrix24-tasks"
+			}
+		]
+	},
+	"alias": [
+		"Bitrix24",
+		"Bitrix",
+		"Битрикс24",
+		"Битрикс",
+		"Task",
+		"Задача",
+		"To-Do",
+		"Checklist",
+		"Чек-лист",
+		"Time Tracking",
+		"Учёт времени",
+		"Project",
+		"Проект",
+		"Workgroup",
+		"Рабочая группа",
+		"Kanban",
+		"Канбан",
+		"Scrum",
+		"Скрам",
+		"Sprint",
+		"Спринт",
+		"Flow",
+		"Поток",
+		"Template",
+		"Шаблон"
+	]
+}

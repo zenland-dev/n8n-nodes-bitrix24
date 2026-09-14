@@ -1,13 +1,14 @@
 {
 	"name": "@zenland-dev/n8n-nodes-bitrix24",
-	"version": "0.1.0",
-	"description": "Bitrix24 nodes for n8n: CRM, any REST method, batches and a webhook trigger",
+	"version": "0.2.0",
+	"description": "Bitrix24 nodes for n8n: CRM, tasks and workgroups, any REST method, batches and a webhook trigger",
 	"keywords": [
 		"n8n-community-node-package",
 		"n8n",
 		"bitrix24",
 		"bitrix",
-		"crm"
+		"crm",
+		"tasks"
 	],
 	"license": "MIT",
 	"homepage": "https://github.com/zenland-dev/n8n-nodes-bitrix24",
@@ -47,6 +48,7 @@
 		"nodes": [
 			"dist/nodes/Bitrix24/Bitrix24.node.js",
 			"dist/nodes/Bitrix24Crm/Bitrix24Crm.node.js",
+			"dist/nodes/Bitrix24Tasks/Bitrix24Tasks.node.js",
 			"dist/nodes/Bitrix24Trigger/Bitrix24Trigger.node.js"
 		]
 	},

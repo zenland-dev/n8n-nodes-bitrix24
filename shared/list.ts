@@ -19,6 +19,11 @@ export interface ListOptions {
 	 * has not asked for its own sort order.
 	 */
 	idField?: string;
+	/**
+	 * Key of the ID inside a returned row, when it is spelled differently from the
+	 * filter field: tasks.task.list filters and sorts by ID but answers with id.
+	 */
+	rowIdKey?: string;
 	/** Stop after this many rows. Undefined means all. */
 	limit?: number;
 	v3?: boolean;
@@ -82,7 +87,7 @@ export async function listAll(
 			if (limit !== undefined && rows.length >= limit) return rows.slice(0, limit);
 			if (pageRows.length < PAGE_SIZE) break;
 
-			const nextId = Number(pageRows[pageRows.length - 1][idField]);
+			const nextId = Number(pageRows[pageRows.length - 1][options.rowIdKey ?? idField]);
 			// A method that ignores the ID filter would loop forever on the same page.
 			if (!Number.isFinite(nextId) || nextId <= lastId) break;
 			lastId = nextId;

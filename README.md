@@ -1,22 +1,24 @@
 # @zenland-dev/n8n-nodes-bitrix24
 
 n8n community nodes for [Bitrix24](https://www.bitrix24.com): a CRM node with 268 operations
-across 42 resources, a node that calls any of the ~1400 REST methods by name or in batches,
-and a trigger for outgoing webhooks.
+across 42 resources, a tasks node with 129 operations across 17 resources, a node that calls
+any of the ~1400 REST methods by name or in batches, and a trigger for outgoing webhooks.
 
 Written from scratch against the official REST documentation
 ([bitrix24/b24restdocs](https://github.com/bitrix24/b24restdocs), read on 14.09.2026). No code
 from any other package.
 
-**Status: 0.1.0.** Every one of the 277 operations was run on a live production portal:
-reads as they are, writes on throwaway pipelines and records the test created and deleted.
-17 of them work with a limitation of Bitrix24 itself, listed under
+**Status: 0.2.0.** Every operation of the CRM node was run on a live production portal, and
+116 of the 129 of the tasks node: reads as they are, writes on objects the test created and
+deleted. The other 13 are scrum sprints and sprint kanbans, which that portal gave nothing to
+run on. Operations that work with a limitation of Bitrix24 itself are listed under
 [Quirks](#quirks-worth-knowing). See [What was checked](#what-was-checked).
 
 - [Installation](#installation)
 - [Credentials](#credentials)
 - [Bitrix24 node](#bitrix24-node)
 - [Bitrix24 CRM](#bitrix24-crm)
+- [Bitrix24 Tasks](#bitrix24-tasks)
 - [Bitrix24 Trigger](#bitrix24-trigger)
 - [Rate limits](#rate-limits)
 - [Quirks worth knowing](#quirks-worth-knowing)
@@ -37,11 +39,11 @@ Requires n8n 2.x and Node 20.19 or newer.
 
 ## Credentials
 
-All three nodes use **Bitrix24 Webhook API**, built from an inbound webhook.
+All four nodes use **Bitrix24 Webhook API**, built from an inbound webhook.
 
 Create the webhook in Bitrix24 under **Developer resources → Other → Inbound webhook** and tick
-the permissions the workflows need: `crm` for the CRM node, plus whatever modules you call
-through the Bitrix24 node. The webhook acts as the user who created it and sees only what that
+the permissions the workflows need: `crm` for the CRM node; `task`, `tasks` and `sonet_group`
+for the tasks node; plus whatever modules you call through the Bitrix24 node. The webhook acts as the user who created it and sees only what that
 user may see, so a webhook made by a sales manager cannot read another manager's deals.
 
 The credential has three fields instead of one URL.
@@ -176,6 +178,64 @@ Before creating a client, **Duplicate → Find by Phone or Email** answers `foun
 contact and company IDs. Bitrix24 itself returns `[]` for no match and an object for a match;
 the node smooths that into one shape.
 
+## Bitrix24 Tasks
+
+Tasks, and everything a task lives in: checklists, time, results, dependencies, kanban
+stages, templates, flows, workgroups and scrum. The webhook needs the `task` permission, plus
+`sonet_group` for workgroups and `tasks` for the operations marked REST 3.0 below.
+
+| Resource | Operations |
+|---|---|
+| **Task** | Create, Get, Get Many, Update, Delete, Get Fields, Start, Pause, Defer, Complete, Reopen, Approve, Return for Rework, Delegate, Start Watching, Stop Watching, Add to Favorites, Remove From Favorites, Pin, Unpin, Mute, Unmute, Add Comment, Get History, Get Counters, Check Access, Attach File, Get Daily Plan |
+| **Checklist Item** | Create, Get, Get Many, Update, Delete, Complete, Reopen, Move After |
+| **Time Entry** | Create, Get, Get Many, Update, Delete |
+| **Result** | Create, Create From Chat Message, Get Many, Update, Delete |
+| **Dependency** | Create, Delete, Get Many |
+| **Kanban Stage** | Create, Get Many, Update, Delete, Move Task, Check Move Permission (group kanbans and My Plan) |
+| **Custom Field** | Create, Get, Get Many, Update, Delete, Get Types, Get Fields |
+| **Task Template** | Create, Get, Update, Delete, Get Fields |
+| **Template Checklist Item** | Create, Get, Get Many, Update, Delete, Complete, Reopen, Move After, Move Before, Attach Drive Files, Remove Attachments |
+| **Flow** | Create, Get, Update, Delete, Activate, Deactivate, Toggle Pin, Check Name |
+| **Workgroup** | Create, Get, Get Many, Get My Groups, Update, Delete, Set Owner, Check Feature Access |
+| **Workgroup Member** | Add, Invite, Request to Join, Get Many, Set Role, Remove |
+| **Scrum Sprint** | Create, Get, Get Many, Update, Delete, Start, Complete Active Sprint, Get Fields |
+| **Scrum Epic, Scrum Backlog** | Create, Get, (Get Many), Update, Delete, Get Fields |
+| **Scrum Kanban Stage** | Create, Get Many, Update, Delete, Add Task, Remove Task, Get Fields |
+| **Scrum Task** | Get, Update, Get Fields |
+
+### Two APIs under one node
+
+Bitrix24 is moving tasks to REST 3.0, and on a cloud portal in September 2026 both answer. The
+node uses the classic `tasks.task.*` for almost everything, because REST 3.0 cannot yet filter a
+task list by anything but ID. REST 3.0 is used where the classic API has nothing: **Add
+Comment**, **Result → Create / Update / Delete / Create From Chat Message** and
+**Dependency → Get Many**.
+
+Fields are written in UPPER_CASE and come back in camelCase: `RESPONSIBLE_ID` goes in,
+`responsibleId` comes out. That is Bitrix24, not the node.
+
+### Comments are chat messages now
+
+Since the new task card (module `tasks` 25.700), a task's discussion is a chat. **Add Comment**
+posts into it. The old comment methods (`task.commentitem.*`) no longer read, change or delete
+anything on such portals, so the node does not wrap them. Reading the chat belongs to the
+messenger API (`im.dialog.messages.get` with `chat<chatId>`), which the Bitrix24 node can call;
+`chatId` is in every task.
+
+### Statuses
+
+`status` is a number: 2 pending, 3 in progress, 4 awaiting control, 5 completed, 6 deferred,
+7 declined. Change it with the operations, not by writing `STATUS`: they run the checks a
+person pressing the button would. A task with **Require Result** does not complete until
+**Result → Create**; a task with **Task Control** goes to 4 and waits for **Approve** or
+**Return for Rework** by its creator.
+
+### Get Many reads by ID
+
+As in the CRM node: sorted by ID, the next 50 above the last one, no total. **Order (JSON)**
+switches to offset paging, which counts the total on every page. On the test portal, with 69 000
+tasks, that is the difference between a quarter and half a second per page.
+
 ## Bitrix24 Trigger
 
 Starts a workflow when Bitrix24 posts an outgoing webhook.
@@ -247,6 +307,40 @@ per integration keeps one runaway workflow from blocking the others.
 - Call lists cannot be deleted through the API.
 - Creating or changing a lead starts the portal's lead business processes, like a person would.
 
+Tasks and workgroups:
+
+- **Request to Join from someone already in the group takes them out of it**, and the answer
+  is `true`. Tried on the owner: after the request the group had no members at all. The node
+  refuses the request for a member.
+- The node also refuses to **Remove** an owner: move ownership with **Set Owner** first. What
+  Bitrix24 itself does with that request was not tried on a group that still had its owner.
+- Add, Invite and Set Role on the owner answer an empty list and change nothing.
+- Approve and Return for Rework need two people. On a task whose creator is also its responsible
+  user, control is skipped: Complete goes straight to completed, and both answer
+  `Action unavailable`.
+- On a task with time tracking, Start and Pause write time entries by themselves (1 second on
+  the test run).
+- Time Entry → Get Many across all tasks includes entries of deleted tasks; Get on those answers
+  `Task not found or not accessible`.
+- A dependency lives on the dependent task: after Dependency → Create from A to B, Get Many of B
+  lists A and Get Many of A is empty.
+- A kanban stage that still holds tasks is not deleted: `NO_EMPTY`. The first stage of a group
+  kanban is a system one and is never deleted: `IS_SYSTEM`.
+- A file attached to a task in a group is copied to the group's Drive, and a group with files on
+  its Drive cannot be deleted: `DISK_NOT_EMPTY`.
+- Flow → Update resets settings the request leaves out: the flow's template went back to 0.
+  Toggle Pin answers the new state, `pinned: true` or `false`.
+- A sprint needs start, end and status (`Incorrect dateStart format`, `Incorrect sprint status`
+  otherwise), and a real scrum. On the test portal every group created through the API came out
+  as a collab with the scrum master dropped, so sprints could not be created there (`Unable to
+  add sprint`). Epics and backlogs work on such a group anyway.
+- The ID of a message in the task chat is not in the task history; a result from a chat message
+  needs the ID from the messenger (`im.dialog.messages.get`) or from the Task Comment Added
+  trigger event.
+- `tasks.task.add` once answered with an internal PHP error
+  (`Workgroup::getUserMemberIds(): Return value must be of type array`) for a group whose owner
+  had been taken out by Request to Join, and saved the task all the same.
+
 ## What was checked
 
 On a live production portal, 14.09.2026, through a harness that runs the compiled nodes with a
@@ -269,16 +363,37 @@ takes `ID` where every other currency method takes `id`; `userfieldconfig.add` a
 `update` take `field`, not `fields`; adding a product to a payment needs `quantity`; and
 a payment accepts only `paySystemId` and `paid` on update.
 
+The tasks node was checked the same way on the same portal, on the owner's go-ahead: tasks, a
+custom field, hidden workgroups, flows, templates, My Plan stages and scratch files on the
+webhook user's Drive, all marked, all deleted at the end. Every person on every test object was
+the webhook user, so nobody else was notified, and nothing was linked to CRM records. A final
+search found nothing marked outside the task recycle bin.
+
+| Bitrix24 Tasks | Operations |
+|---|---|
+| Write, checked | 64 |
+| Read, checked | 36 |
+| Works, with a Bitrix24 limitation | 16 |
+| Not checked: no scrum to run on | 13 |
+
+Those runs changed the node before this version: Request to Join refuses a member (Bitrix24
+takes the member out instead), Remove refuses a group owner, Sprint → Create requires start, end
+and status, Dependency → Get Many says which task holds the link, and Toggle Pin answers the
+state instead of a success flag.
+
 The trigger was fed hand-made deliveries (10 checks, including a wrong token and `__proto__`
 keys) and fetched a real deal. A delivery from Bitrix24 itself needs an n8n with a public
-address. Offline, every operation runs with sample parameters, and every one of the 227 methods
-the nodes call exists in the documentation.
+address. Offline, every operation runs with sample parameters, and every method the four nodes
+call exists in the documentation.
 
 ## What is not here yet
 
-- Nodes for tasks, messenger and open channels, drive, calendar, telephony, workgroups,
-  business processes and lists, the store and catalog, sites, booking, mail and BI. Until then,
-  the Bitrix24 node calls their methods directly.
+- Nodes for messenger and open channels, drive, calendar, telephony, business processes and
+  lists, the store and catalog, sites, booking, mail and BI. Until then, the Bitrix24 node calls
+  their methods directly.
+- In the tasks node: legacy task comments (`task.commentitem.*`, gone from the new task card),
+  reading the task chat, and a trigger read of the changed task like the one the trigger does for
+  CRM records.
 - An OAuth2 credential for a local application, and with it everything Bitrix24 reserves for
   applications: `event.bind`, custom automation robots, placements, open-channel connectors.
 - Timeline layout blocks, icons and logos, configurable activities and activity badges, which
