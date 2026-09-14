@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.3.0 — 14.09.2026
+
+- **Bitrix24 Messenger**, a new node: 63 operations across 10 resources. Messages with
+  attachments, keyboards and context menus, edits, likes, read marks and search; group chats and
+  their members; the recent chats list; files uploaded from binary data and downloaded into it;
+  notifications; users, their status and colleagues; departments; the search history; the event
+  queue of the webhook user (`im.v2.Event`).
+- **Bitrix24 Open Lines**, a new node: 43 operations across 6 resources. Dialogs and sessions,
+  operator actions, chats of CRM records, open line settings, contact center statistics
+  (`imopenlines.v2`) and actions of a line chatbot.
+- **Bitrix24 Messenger Trigger**, a new polling trigger: new, edited and deleted messages,
+  reactions and new members in the chats of the webhook user, without a public URL.
+- File downloads never output the link Bitrix24 returns: for a webhook it contains the webhook code.
+- Checked on a live portal: 56 of the 63 messenger operations, 14 of the 43 open lines operations,
+  and the trigger. The open lines operations that reach real clients were not run.
+- Shared helpers for Y/N flags, ID lists, offset paging and message JSON moved into `shared/`. No
+  change to any published parameter, operation or credential.
+
 ## 0.2.0 — 14.09.2026
 
 - **Bitrix24 Tasks**, a new node: 129 operations across 17 resources. Tasks with their status

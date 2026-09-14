@@ -1,25 +1,30 @@
 # @zenland-dev/n8n-nodes-bitrix24
 
 n8n community nodes for [Bitrix24](https://www.bitrix24.com): a CRM node with 268 operations
-across 42 resources, a tasks node with 129 operations across 17 resources, a node that calls
-any of the ~1400 REST methods by name or in batches, and a trigger for outgoing webhooks.
+across 42 resources, a tasks node with 129 operations across 17 resources, a messenger node with
+63 operations, an open lines node with 43, a node that calls any of the ~1400 REST methods by name
+or in batches, a trigger for outgoing webhooks and a trigger for new chat messages that needs no
+public URL.
 
 Written from scratch against the official REST documentation
 ([bitrix24/b24restdocs](https://github.com/bitrix24/b24restdocs), read on 14.09.2026). No code
 from any other package.
 
-**Status: 0.2.0.** Every operation of the CRM node was run on a live production portal, and
-116 of the 129 of the tasks node: reads as they are, writes on objects the test created and
-deleted. The other 13 are scrum sprints and sprint kanbans, which that portal gave nothing to
-run on. Operations that work with a limitation of Bitrix24 itself are listed under
-[Quirks](#quirks-worth-knowing). See [What was checked](#what-was-checked).
+**Status: 0.3.0.** Every operation of the CRM node was run on a live production portal, 116 of
+the 129 of the tasks node, 56 of the 63 of the messenger node and 14 of the 43 of the open lines
+node: reads as they are, writes on objects the test created and deleted. What was not run, and
+why, is under [What was checked](#what-was-checked). Operations that work with a limitation of
+Bitrix24 itself are listed under [Quirks](#quirks-worth-knowing).
 
 - [Installation](#installation)
 - [Credentials](#credentials)
 - [Bitrix24 node](#bitrix24-node)
 - [Bitrix24 CRM](#bitrix24-crm)
 - [Bitrix24 Tasks](#bitrix24-tasks)
+- [Bitrix24 Messenger](#bitrix24-messenger)
+- [Bitrix24 Open Lines](#bitrix24-open-lines)
 - [Bitrix24 Trigger](#bitrix24-trigger)
+- [Bitrix24 Messenger Trigger](#bitrix24-messenger-trigger)
 - [Rate limits](#rate-limits)
 - [Quirks worth knowing](#quirks-worth-knowing)
 - [What was checked](#what-was-checked)
@@ -39,11 +44,12 @@ Requires n8n 2.x and Node 20.19 or newer.
 
 ## Credentials
 
-All four nodes use **Bitrix24 Webhook API**, built from an inbound webhook.
+All seven nodes use **Bitrix24 Webhook API**, built from an inbound webhook.
 
 Create the webhook in Bitrix24 under **Developer resources → Other → Inbound webhook** and tick
 the permissions the workflows need: `crm` for the CRM node; `task`, `tasks` and `sonet_group`
-for the tasks node; plus whatever modules you call through the Bitrix24 node. The webhook acts as the user who created it and sees only what that
+for the tasks node; `im` for the messenger node and its trigger; `imopenlines` for the open lines
+node, plus `crm` for its CRM chats; plus whatever modules you call through the Bitrix24 node. The webhook acts as the user who created it and sees only what that
 user may see, so a webhook made by a sales manager cannot read another manager's deals.
 
 The credential has three fields instead of one URL.
@@ -218,9 +224,8 @@ Fields are written in UPPER_CASE and come back in camelCase: `RESPONSIBLE_ID` go
 
 Since the new task card (module `tasks` 25.700), a task's discussion is a chat. **Add Comment**
 posts into it. The old comment methods (`task.commentitem.*`) no longer read, change or delete
-anything on such portals, so the node does not wrap them. Reading the chat belongs to the
-messenger API (`im.dialog.messages.get` with `chat<chatId>`), which the Bitrix24 node can call;
-`chatId` is in every task.
+anything on such portals, so the node does not wrap them. The chat is read with **Bitrix24
+Messenger → Message → Get Many** and the Dialog ID `chat<chatId>`; `chatId` is in every task.
 
 ### Statuses
 
@@ -235,6 +240,108 @@ person pressing the button would. A task with **Require Result** does not comple
 As in the CRM node: sorted by ID, the next 50 above the last one, no total. **Order (JSON)**
 switches to offset paging, which counts the total on every page. On the test portal, with 69 000
 tasks, that is the difference between a quarter and half a second per page.
+
+## Bitrix24 Messenger
+
+Chats, messages, files and notifications, as the user who owns the webhook. Everything this node
+sends comes from that user, and everything it reads is what that user sees: a chat they are not
+in does not open.
+
+| Resource | Operations |
+|---|---|
+| **Message** | Send, Update, Delete, Get Many, Search, Like, Mark as Read, Mark as Unread, Mark All as Read, Send Typing Indicator, Create Object From Message, Run Bot Command |
+| **Chat** | Create, Get, Find by Linked Object, Search, Update, Set Owner, Mute or Unmute, Leave |
+| **Chat Member** | Add, Remove, Get Many, Get IDs |
+| **Recent Chat** | Get Many, Get Changes, Pin or Unpin, Hide, Set Unread Mark |
+| **File** | Upload, Download, Attach Drive Files, Save to Drive, Delete, Get Chat Folder |
+| **Notification** | Send, Get Many, Search, Delete, Mark as Read, Mark All as Read, Answer, Press Button, Get Types |
+| **User** | Get, Get Many, Search, Get Colleagues, Get Status, Set Status, Set Away, Clear Away, Get Unread Counters |
+| **Department** | Get, Get Employees, Get Heads, Search |
+| **Search History** | Add, Remove, Get Many |
+| **Event Queue** | Subscribe, Unsubscribe, Get Many |
+
+### Dialog ID
+
+A conversation has one address in three spellings: `chat123` for group chat 123, `sg12` for the
+chat of workgroup 12, and a plain user ID such as `7` for the private chat with user 7. Operations
+that only make sense for group chats take **Chat ID**, a number, and accept `chat123` as well.
+
+**Chat → Find by Linked Object** gets the chat of a task (`TASKS_TASK` and the task ID), a CRM
+record (`CRM` and `DEAL|1663`), a workgroup, a calendar event or a call. **Create** refuses to bind a
+new chat to a workgroup: every group already has its chat, and the documentation warns that a
+second one breaks the chats of the group's tasks.
+
+### Sending
+
+**Message → Send** takes text with BB codes (`[B]bold[/B]`, `[USER=7]Anna[/USER]`,
+`[URL=https://example.com]link[/URL]`), plus optional **Attachment (JSON)**, **Keyboard (JSON)** and
+**Context Menu (JSON)**. Keyboard buttons that only run a bot command are dropped by Bitrix24 when a
+user sends the message; links and `ACTION` buttons stay.
+
+**Update** refuses an empty text. Bitrix24 treats an empty `MESSAGE` as "delete this message", and a
+field mapped from an empty expression should not do that silently.
+
+**Notification → Send** puts a notice into a user's bell instead of a chat, from the webhook user or
+as a system notice. The documented tags that replace or group notifications do nothing through a
+webhook: Bitrix24 does not store them, so the node does not offer them.
+
+### Reading
+
+**Message → Get Many** reads the latest messages, or pages back from a message or forward from it,
+50 per request. Each message gets its `author` and `files` joined in, which Bitrix24 returns as
+separate lists. **Search** finds messages in one chat by text and dates, 200 per request.
+
+On the test portal, reading messages and notifications did not change any unread counter. Marking
+is done only by the Mark operations.
+
+### Files
+
+**Upload** sends binary data into a chat in one request (`im.v2.File.upload`, up to 100 MB).
+**Download** puts a chat file into binary data. There is no "get download link" operation on purpose:
+the link Bitrix24 returns to a webhook is `/rest/<user>/<webhook code>/download/…`, so it carries the
+webhook secret. The node fetches it inside the operation, only from the portal it came from, and
+keeps it out of the output and out of error messages.
+
+### Event Queue
+
+Bitrix24 can record the messenger events of a user and hand them out on request, which needs no
+public address. **Subscribe** starts recording new messages, deletions, reactions and new members in
+every chat of the webhook user. **Get Many** reads them; passing the `nextOffset` of the previous read
+confirms, and deletes, what came before. Events are kept for 24 hours. The **Bitrix24 Messenger
+Trigger** does all of this by itself.
+
+## Bitrix24 Open Lines
+
+The contact center: conversations with clients who write from a website chat, Telegram, WhatsApp
+and other connected channels. Messages sent here reach clients in their messenger.
+
+| Resource | Operations |
+|---|---|
+| **Dialog** | Get, Get Chat by User Code, Get History, Start Session, Start Session From Message, Join, Take Over, Pin or Unpin, Pin All, Unpin All, Set Silent Mode, Rate as Supervisor, Create Lead, Save as Quick Answer |
+| **Operator** | Take, Skip, Transfer, Finish, Finish Another Operator's, Mark as Spam |
+| **CRM Chat** | Get Many, Get Latest Chat ID, Add User, Remove User, Send Message |
+| **Open Line** | Create, Get, Get Many, Update, Delete, Get Public Page Link, Connect Network Line, Send Network Message |
+| **Statistics** | Get Summary, Get Sessions, Get Session Metrics, Get Transfers, Get Ratings, Get Operator Load |
+| **Bot Dialog** | Send Automatic Message, Hand to Free Operator, Transfer, Finish |
+
+A conversation is an open channel chat (**Chat ID**), and each round of it, from the first client
+message to closing, is a session (**Session ID**). To reach the client of a deal, find the chat with
+**CRM Chat → Get Many** or **Get Latest Chat ID**, then **CRM Chat → Send Message** from an employee who
+is in that chat.
+
+**Open Line → Create** and **Update** show the settings people usually change: queue, distribution,
+working hours, days off, welcome message, rating request. The other sixty or so settings of
+`imopenlines.config.add` go into **Other Settings (JSON)** by their names.
+
+**Statistics** reads the `imopenlines.v2` reports: totals for a period with breakdowns by channel,
+hour and operator; sessions with filters; per-session metrics and transfer history (any number of
+IDs, split into the batches Bitrix24 allows); client ratings; the current load of operators. A period
+is at most 366 days. These methods need access to open channel reports on the plan and for the user.
+
+**Bot Dialog** acts for a chatbot connected to a line. Through a webhook Bitrix24 must be told which
+bot: give the `botToken` it was registered with in `imbot.v2`.
+
+Connectors (`imconnector.*`) are not here: Bitrix24 does not let a webhook call them.
 
 ## Bitrix24 Trigger
 
@@ -257,6 +364,27 @@ Bitrix24 sends only IDs, for example `data.FIELDS.ID` on `ONCRMDEALUPDATE`. **Fe
 CRM Record** reads the whole lead, deal, contact, company, quote or smart process item after an
 add or update event and puts it under `record`. If that read fails, the workflow still starts,
 with the reason in `recordError`.
+
+## Bitrix24 Messenger Trigger
+
+Starts a workflow on new, edited or deleted messages, reactions and new members in the chats of the
+webhook user. It polls Bitrix24's event queue on n8n's schedule, so it works on an n8n without a
+public address and needs no setup in Bitrix24.
+
+- On activation it subscribes the webhook user and skips whatever is already queued, so turning the
+  workflow on does not replay the last day.
+- **Dialog IDs** narrows it to some conversations: `chat123` for a group chat, a user ID for a
+  private one.
+- The webhook user's own messages and reactions are dropped unless **Include Own Events** is on, so a
+  workflow that answers in the same chat does not start itself.
+- A manual test run reads what is queued without confirming it; the active workflow still gets it.
+
+Bitrix24 keeps one queue per user. A second workflow, or another application reading the same user,
+takes events away from this one: use a separate webhook user per listener. Deactivating the workflow
+does not unsubscribe; **Messenger → Event Queue → Unsubscribe** does.
+
+On the test portal an edit made through the REST API did not reach the queue, while new messages,
+reactions and deletions did. Edits made in the Bitrix24 apps were not tried.
 
 ## Rate limits
 
@@ -335,11 +463,29 @@ Tasks and workgroups:
   as a collab with the scrum master dropped, so sprints could not be created there (`Unable to
   add sprint`). Epics and backlogs work on such a group anyway.
 - The ID of a message in the task chat is not in the task history; a result from a chat message
-  needs the ID from the messenger (`im.dialog.messages.get`) or from the Task Comment Added
+  needs the ID from Bitrix24 Messenger → Message → Get Many or from the Task Comment Added
   trigger event.
 - `tasks.task.add` once answered with an internal PHP error
   (`Workgroup::getUserMemberIds(): Return value must be of type array`) for a group whose owner
   had been taken out by Request to Join, and saved the task all the same.
+
+Messenger and open lines:
+
+- The download link Bitrix24 gives a webhook (`im.v2.File.download`) contains the webhook code in
+  its path. Anything that prints it hands the secret over, which is why the node has no Get Download
+  Link.
+- Tags on notifications (`TAG`, `SUB_TAG` with `CLIENT_ID`) are ignored through a webhook: a second
+  notification with the same tag did not replace the first, the tag was not stored, and Delete by
+  tag answered `true` and removed nothing.
+- Get IDs of chat members (`im.chat.user.list`) answers `ACCESS_ERROR` on the company-wide general
+  chat even for its members; Get Many (`im.dialog.users.list`) works there.
+- A chat cannot be deleted through the API, only left. A system message in it cannot be deleted
+  either: `CANT_EDIT_MESSAGE`.
+- An edit through `im.message.update` did not produce `ONIMV2MESSAGEUPDATE` in the event queue
+  within 12 seconds; the send, the reaction and the deletion around it did.
+- Reading messages, notifications and recent chats did not change unread counters.
+- `imconnector.*` does not work with webhooks at all (stated in the documentation), so custom
+  open channel connectors need an application.
 
 ## What was checked
 
@@ -381,19 +527,50 @@ takes the member out instead), Remove refuses a group owner, Sprint → Create r
 and status, Dependency → Get Many says which task holds the link, and Toggle Pin answers the
 state instead of a success flag.
 
+The messenger node read real chats and notifications of the webhook user, printing only counts and
+field names, and wrote into a closed chat marked `[n8n-test]` with the webhook user as its only
+member: messages, edits, likes, files, marks, pins, the event queue. Notifications went to the
+webhook user, the status was changed and put back. The harness checked every output for the webhook
+code. At the end messages, files, notifications and the Drive copy were deleted and the chat was
+left; Bitrix24 has no way to delete a chat.
+
+| Bitrix24 Messenger | Operations |
+|---|---|
+| Write, checked | 28 |
+| Read, checked | 23 |
+| Works, with a Bitrix24 limitation | 5 |
+| Not run: would touch every real chat, create a feed post, or needs a bot or another person | 7 |
+
+The open lines node read line settings, CRM chats and statistics, and created, changed and deleted
+an inactive test line. Dialogs, operator actions, CRM chat writes and bot dialogs work on
+conversations with real clients, and the portal has no test client, so they were not run.
+
+| Bitrix24 Open Lines | Operations |
+|---|---|
+| Write, checked | 3 |
+| Read, checked | 11 |
+| Not run: they reach real clients | 29 |
+
+Those runs changed the messenger node before this version: Get Download Link was removed because
+the link carries the webhook code, and notification tags were removed because a webhook cannot use
+them. The Message Edited option of the trigger now says that REST edits did not arrive.
+
+The Messenger Trigger was run on the same chat: the first poll skips what is queued, a manual run
+confirms nothing, the dialog filter and the own-message filter work.
+
 The trigger was fed hand-made deliveries (10 checks, including a wrong token and `__proto__`
 keys) and fetched a real deal. A delivery from Bitrix24 itself needs an n8n with a public
-address. Offline, every operation runs with sample parameters, and every method the four nodes
-call exists in the documentation.
+address. Offline, every operation runs with sample parameters, and every method the nodes call
+exists in the documentation.
 
 ## What is not here yet
 
-- Nodes for messenger and open channels, drive, calendar, telephony, business processes and
-  lists, the store and catalog, sites, booking, mail and BI. Until then, the Bitrix24 node calls
-  their methods directly.
-- In the tasks node: legacy task comments (`task.commentitem.*`, gone from the new task card),
-  reading the task chat, and a trigger read of the changed task like the one the trigger does for
-  CRM records.
+- Nodes for drive, calendar, telephony, business processes and lists, the store and catalog,
+  sites, booking, mail and BI. Until then, the Bitrix24 node calls their methods directly.
+- Chatbots 2.0 (`imbot.v2`): registering a bot and answering as it. The API works with webhooks and
+  has a polling mode, so it fits n8n; it is a separate node still to come.
+- In the tasks node: legacy task comments (`task.commentitem.*`, gone from the new task card) and a
+  trigger read of the changed task like the one the trigger does for CRM records.
 - An OAuth2 credential for a local application, and with it everything Bitrix24 reserves for
   applications: `event.bind`, custom automation robots, placements, open-channel connectors.
 - Timeline layout blocks, icons and logos, configurable activities and activity badges, which

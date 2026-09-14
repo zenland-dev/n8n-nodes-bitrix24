@@ -1,0 +1,35 @@
+{
+	"node": "@zenland-dev/n8n-nodes-bitrix24.bitrix24OpenLines",
+	"nodeVersion": "1.0",
+	"codexVersion": "1.0",
+	"categories": ["Communication", "Sales"],
+	"resources": {
+		"credentialDocumentation": [
+			{
+				"url": "https://github.com/zenland-dev/n8n-nodes-bitrix24?tab=readme-ov-file#credentials"
+			}
+		],
+		"primaryDocumentation": [
+			{
+				"url": "https://github.com/zenland-dev/n8n-nodes-bitrix24?tab=readme-ov-file#bitrix24-open-lines"
+			}
+		]
+	},
+	"alias": [
+		"Bitrix24",
+		"Bitrix",
+		"Битрикс24",
+		"Битрикс",
+		"Open Lines",
+		"Открытые линии",
+		"Open Channels",
+		"Contact Center",
+		"Контакт-центр",
+		"Operator",
+		"Оператор",
+		"Live Chat",
+		"Онлайн-чат",
+		"Customer Support",
+		"Поддержка клиентов"
+	]
+}
