@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.4.1 — 15.09.2026
+
+Fixes that came out of Bitrix24's rebuilt documentation of CRM fields, each checked on a live portal
+with imported test leads, contacts and companies.
+
+- **Import** of a lead, contact or company failed with error 100, `The value of an argument 'value'
+  must be of type Bitrix\Crm\Multifield\Collection`, whenever Phones, Emails and Messengers was
+  filled in: `crm.item.import` does not take `fm`. The node now sends contact details as the
+  `PHONE`, `EMAIL`, `WEB` and `IM` lists that method takes, `fm` from Fields (JSON) included.
+- The field mapper of Create, Update and Import no longer offers `contacts` and `companies`.
+  `crm.item.fields` lists them as writable, under the same titles as `contactIds` and
+  `companyIds`, and writing them fails with error 100.
+- Phones, Emails and Messengers said an existing value could be changed or removed by its ID in
+  `fm`. `crm.item.update` ignores that ID and adds the value again. The description and the README
+  now point to `crm.contact.update`, `crm.lead.update` or `crm.company.update` through the Bitrix24
+  node, which change and delete a value by its ID.
+- Get Many of leads, contacts and companies: Fields to Return says `fm` comes back only when it is
+  empty or `*`.
+- Bitrix24 Trigger: the three task comment events carry the documentation's warning for the new
+  task card: no update or delete events, and the message ID in `MESSAGE_ID`.
+- No change to any published parameter, operation or credential.
+
 ## 0.4.0 — 15.09.2026
 
 - **Bitrix24 Chatbot**, a new node on Chatbots 2.0 (`imbot.v2`): 34 operations across 7 resources.

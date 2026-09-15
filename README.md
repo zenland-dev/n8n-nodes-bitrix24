@@ -178,19 +178,38 @@ Create, Update and Import show a field mapper filled from `crm.item.fields`. Cus
 in it with their labels, list fields become dropdowns with the portal's own values, and stage
 IDs come with the pipeline in front (`Partners / Negotiation`). On the test portal a deal had
 384 fields and 170 stages across 15 pipelines, so the mapper adds nothing by default: pick the
-fields you need. Read-only fields are left out, and nothing is required on Update.
+fields you need. Nothing is required on Update. Read-only fields are left out, and so are
+`contacts` and `companies`: `crm.item.fields` lists them as writable, under the same titles as
+`contactIds` and `companyIds`, but writing them fails with error 100.
 
 Anything the mapper cannot express goes into **Fields (JSON)**, which is merged last and wins.
 Clearing a field is done there too: the mapper skips empty inputs rather than sending blanks.
 
-Leads, contacts and companies have a separate **Phones, Emails and Messengers** list. It adds
-values; changing or deleting an existing phone needs its ID, sent in `fm` through Fields (JSON).
+Leads, contacts and companies have a separate **Phones, Emails and Messengers** list. On Update
+it only adds. `crm.item.update` ignores the ID of an existing value in `fm`, and an empty value
+removes nothing, so a phone cannot be changed or deleted through this node. The older
+per-entity methods can, through **Bitrix24 → Method → Call**: `crm.contact.update` (or
+`crm.lead.update`, `crm.company.update`) with
+
+```json
+{"id": 15, "fields": {"PHONE": [{"ID": 711, "VALUE": "+49 30 7654321"}]}}
+```
+
+and `"DELETE": "Y"` in place of `VALUE` to remove one. The value IDs are in `fm` of **Get**, and
+of **Get Many** when **Fields to Return** is empty or `*`; with a list of fields Bitrix24 leaves
+`fm` out.
 
 ### Create runs automation, Import does not
 
 **Create** behaves like a person pressing Save: automation rules, workflows, notifications to
 the responsible user. **Import** (`crm.item.import`) creates the record without automation
 rules and workflows. Use it for tests on a portal where a new deal would send a client an SMS.
+
+Import takes phones, emails and messengers too, but not in `fm`: `crm.item.import` answers
+`The value of an argument 'value' must be of type Bitrix\Crm\Multifield\Collection` to the form
+every other `crm.item` method uses. The node sends them as `PHONE`, `EMAIL`, `WEB` and `IM`
+lists instead, including `fm` written into Fields (JSON). Before 0.4.1 an Import with contact
+details failed.
 
 The documentation also promises that Import keeps historical `createdTime`. On a live portal it
 does not: any `createdTime` older than records the portal already has, even by an hour, is
@@ -250,6 +269,10 @@ Since the new task card (module `tasks` 25.700), a task's discussion is a chat. 
 posts into it. The old comment methods (`task.commentitem.*`) no longer read, change or delete
 anything on such portals, so the node does not wrap them. The chat is read with **Bitrix24
 Messenger → Message → Get Many** and the Dialog ID `chat<chatId>`; `chatId` is in every task.
+
+The comment events of the **Bitrix24 Trigger** changed with it. According to the documentation,
+Task Comment Updated and Task Comment Deleted are not sent for such tasks, and Task Comment Added
+comes with `ID` 0 and the message ID in `MESSAGE_ID`. A delivery from the portal was not tried.
 
 ### Statuses
 
@@ -587,8 +610,8 @@ Tasks and workgroups:
   as a collab with the scrum master dropped, so sprints could not be created there (`Unable to
   add sprint`). Epics and backlogs work on such a group anyway.
 - The ID of a message in the task chat is not in the task history; a result from a chat message
-  needs the ID from Bitrix24 Messenger → Message → Get Many or from the Task Comment Added
-  trigger event.
+  needs the ID from Bitrix24 Messenger → Message → Get Many or from `MESSAGE_ID` of the Task
+  Comment Added trigger event.
 - `tasks.task.add` once answered with an internal PHP error
   (`Workgroup::getUserMemberIds(): Return value must be of type array`) for a group whose owner
   had been taken out by Request to Join, and saved the task all the same.
@@ -648,6 +671,12 @@ The live runs found four bugs in the node, fixed before this version: `crm.curre
 takes `ID` where every other currency method takes `id`; `userfieldconfig.add` and
 `update` take `field`, not `fields`; adding a product to a payment needs `quantity`; and
 a payment accepts only `paySystemId` and `paid` on update.
+
+On 15.09.2026, after Bitrix24 rebuilt its page on CRM fields, three more runs on imported test
+leads, contacts and companies checked what the page says about writing fields, and found three
+bugs, fixed in 0.4.1. The mapper offered `contacts` and `companies`, which fail on write. Import
+failed whenever phones or emails were given. And the node's own hint said an existing phone could
+be changed through its ID in `fm`, which Bitrix24 ignores: the phone was added a second time.
 
 The tasks node was checked the same way on the same portal, on the owner's go-ahead: tasks, a
 custom field, hidden workgroups, flows, templates, My Plan stages and scratch files on the
@@ -732,6 +761,9 @@ exists in the documentation.
   sites, booking, mail and BI. Until then, the Bitrix24 node calls their methods directly.
 - A chatbot trigger for bots that post their events to a webhook URL. The polling trigger covers
   every event; a webhook one would save the polling delay on an n8n with a public address.
+- In the CRM node: changing or deleting one phone, email or messenger of a record. `crm.item.update`
+  cannot do it; until an operation over the older per-entity methods exists, **Method → Call** does
+  (see [Fields come from the portal](#fields-come-from-the-portal)).
 - In the tasks node: legacy task comments (`task.commentitem.*`, gone from the new task card) and a
   trigger read of the changed task like the one the trigger does for CRM records.
 - An OAuth2 credential for a local application, and with it everything Bitrix24 reserves for

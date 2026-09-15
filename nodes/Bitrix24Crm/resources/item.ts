@@ -87,7 +87,7 @@ const communicationsProperty: INodeProperties = {
 	placeholder: 'Add Contact Detail',
 	default: {},
 	description:
-		'Added to the ones the record already has. To change or remove an existing value, send its ID in fm through Fields (JSON).',
+		'On Update these are added to the ones the record already has: Bitrix24 ignores the ID of an existing value here. To change or remove one, use the Bitrix24 node (Method → Call) with crm.contact.update, crm.lead.update or crm.company.update and the value ID in PHONE, EMAIL, WEB or IM.',
 	options: [
 		{
 			displayName: 'Contact Detail',
@@ -174,6 +174,25 @@ function collectFields(ctx: IExecuteFunctions, entityTypeId: number, itemIndex: 
 		extra.fm = [...(fields.fm as IDataObject[]), ...(extra.fm as IDataObject[])];
 	}
 	return { ...fields, ...extra };
+}
+
+/**
+ * crm.item.import refuses `fm` (error 100, "must be of type Bitrix\Crm\Multifield\Collection")
+ * and takes contact details the older way, one list per kind: PHONE: [{ VALUE, VALUE_TYPE }].
+ */
+function importContactDetails(fields: IDataObject): IDataObject {
+	if (!Array.isArray(fields.fm)) return fields;
+	const { fm, ...rest } = fields;
+	for (const raw of fm as Array<IDataObject | null>) {
+		const entry = raw ?? {};
+		const kind = String(entry.typeId ?? '').toUpperCase();
+		if (kind === '' || entry.value === undefined || entry.value === null || entry.value === '') continue;
+		const current = rest[kind];
+		const list = (Array.isArray(current) ? current : current === undefined ? [] : [current]) as IDataObject[];
+		list.push(compact({ VALUE: entry.value, VALUE_TYPE: entry.valueType }));
+		rest[kind] = list;
+	}
+	return rest;
 }
 
 function filtersProperty(config: ItemResourceConfig): INodeProperties {
@@ -324,7 +343,9 @@ export function itemResource(config: ItemResourceConfig): Resource {
 						'Extra crm.item filter, merged over Filters. Prefix a field with &gt;, &gt;=, &lt;, &lt;=, !, @ (in list), !@ or % (contains), e.g. {"&gt;opportunity": 1000, "@sourceId": ["WEB", "CALL"]}.',
 				},
 				orderJsonProperty('{"createdTime": "DESC"}'),
-				selectProperty('title, stageId, opportunity, ufCrm_123'),
+				hasContactDetails
+					? { ...selectProperty('title, stageId, opportunity, ufCrm_123'), hint: 'Phones and emails (fm) come back only when this is empty or *' }
+					: selectProperty('title, stageId, opportunity, ufCrm_123'),
 			],
 			async execute(itemIndex) {
 				const entityTypeId = entity(this, itemIndex);
@@ -392,7 +413,7 @@ export function itemResource(config: ItemResourceConfig): Resource {
 			properties: [...lead, fieldsMapperProperty('create'), ...writeExtras],
 			async execute(itemIndex) {
 				const entityTypeId = entity(this, itemIndex);
-				const fields = collectFields(this, entityTypeId, itemIndex);
+				const fields = importContactDetails(collectFields(this, entityTypeId, itemIndex));
 				const body = await bitrix24Request.call(this, 'crm.item.import', { entityTypeId, fields }, { itemIndex });
 				return item(body.result);
 			},

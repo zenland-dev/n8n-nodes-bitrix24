@@ -34,6 +34,12 @@ const FIELD_TYPES: Record<string, FieldType> = {
 /** Fields the mapper leaves out: phones and e-mails have their own collection. */
 const OWN_EDITOR = new Set(['fm']);
 
+/**
+ * System fields crm.item.fields lists without isReadOnly that answer error 100 on write. They
+ * share the title of contactIds and companyIds, so the mapper used to show two "Contacts".
+ */
+const NOT_WRITABLE = new Set(['contacts', 'companies']);
+
 function label(key: string, meta: FieldMeta): string {
 	const title = meta.title || meta.formLabel || meta.listLabel || key;
 	return key.startsWith('uf') ? `${title} (${key})` : title;
@@ -82,9 +88,9 @@ async function optionsFor(
 /**
  * Turns `crm.item.fields` into resource mapper fields.
  *
- * Read-only fields are hidden. For an update, fields that cannot change after
- * creation are hidden too and nothing is required, since only the fields a person
- * adds are sent.
+ * Read-only fields are hidden, and so are contacts and companies. For an update,
+ * fields that cannot change after creation are hidden too and nothing is required,
+ * since only the fields a person adds are sent.
  */
 export async function toMapperFields(
 	ctx: Bitrix24Context,
@@ -95,7 +101,7 @@ export async function toMapperFields(
 	const result: ResourceMapperField[] = [];
 
 	for (const [key, meta] of Object.entries(fields)) {
-		if (OWN_EDITOR.has(key) || meta.isReadOnly) continue;
+		if (OWN_EDITOR.has(key) || NOT_WRITABLE.has(key) || meta.isReadOnly) continue;
 		if (purpose === 'update' && meta.isImmutable) continue;
 
 		let type: FieldType = FIELD_TYPES[meta.type] ?? 'string';
