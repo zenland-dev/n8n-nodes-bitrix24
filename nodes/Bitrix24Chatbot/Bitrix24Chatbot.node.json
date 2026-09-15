@@ -1,0 +1,36 @@
+{
+	"node": "@zenland-dev/n8n-nodes-bitrix24.bitrix24Chatbot",
+	"nodeVersion": "1.0",
+	"codexVersion": "1.0",
+	"categories": ["Communication"],
+	"resources": {
+		"credentialDocumentation": [
+			{
+				"url": "https://github.com/zenland-dev/n8n-nodes-bitrix24?tab=readme-ov-file#credentials"
+			}
+		],
+		"primaryDocumentation": [
+			{
+				"url": "https://github.com/zenland-dev/n8n-nodes-bitrix24?tab=readme-ov-file#bitrix24-chatbot"
+			}
+		]
+	},
+	"alias": [
+		"Bitrix24",
+		"Bitrix",
+		"Битрикс24",
+		"Битрикс",
+		"Chatbot",
+		"Чат-бот",
+		"Bot",
+		"Бот",
+		"Messenger",
+		"Мессенджер",
+		"Slash Command",
+		"Команда",
+		"Keyboard",
+		"Кнопки",
+		"AI Assistant",
+		"ИИ-ассистент"
+	]
+}

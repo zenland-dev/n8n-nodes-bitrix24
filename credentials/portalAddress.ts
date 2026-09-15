@@ -97,6 +97,18 @@ export function normalizeWebhookToken(raw: unknown): string {
 	return WEBHOOK_TOKEN.test(tail) ? tail : '';
 }
 
+/**
+ * Longest `botToken` Bitrix24 accepts. Bot.update enforces it since REST revision 35 and
+ * Bot.register since 06.08.2026 (`BOT_TOKEN_INVALID_LENGTH`).
+ */
+export const BOT_TOKEN_MAX_LENGTH = 40;
+
+/** The chatbot token as stored, trimmed; '' when missing or too long to be accepted. */
+export function normalizeBotToken(raw: unknown): string {
+	const token = String(raw ?? '').trim();
+	return token.length > 0 && token.length <= BOT_TOKEN_MAX_LENGTH ? token : '';
+}
+
 /** Address fields, shared by every credential type so they cannot drift apart. */
 export const portalAddressProperties: INodeProperties[] = [
 	{

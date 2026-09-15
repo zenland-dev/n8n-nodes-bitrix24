@@ -2,17 +2,17 @@
 
 n8n community nodes for [Bitrix24](https://www.bitrix24.com): a CRM node with 268 operations
 across 42 resources, a tasks node with 129 operations across 17 resources, a messenger node with
-63 operations, an open lines node with 43, a node that calls any of the ~1400 REST methods by name
-or in batches, a trigger for outgoing webhooks and a trigger for new chat messages that needs no
-public URL.
+63 operations, an open lines node with 43, a chatbot node with 34, a node that calls any of the
+~1400 REST methods by name or in batches, a trigger for outgoing webhooks, and two triggers that
+need no public URL: one for chat messages, one for messages and commands sent to a bot.
 
 Written from scratch against the official REST documentation
 ([bitrix24/b24restdocs](https://github.com/bitrix24/b24restdocs), read on 14.09.2026). No code
 from any other package.
 
-**Status: 0.3.0.** Every operation of the CRM node was run on a live production portal, 116 of
-the 129 of the tasks node, 56 of the 63 of the messenger node and 14 of the 43 of the open lines
-node: reads as they are, writes on objects the test created and deleted. What was not run, and
+**Status: 0.4.0.** Every operation of the CRM and chatbot nodes was run on a live production
+portal, 116 of the 129 of the tasks node, 57 of the 63 of the messenger node and 14 of the 43 of
+the open lines node: reads as they are, writes on objects the test created and deleted. What was not run, and
 why, is under [What was checked](#what-was-checked). Operations that work with a limitation of
 Bitrix24 itself are listed under [Quirks](#quirks-worth-knowing).
 
@@ -23,8 +23,10 @@ Bitrix24 itself are listed under [Quirks](#quirks-worth-knowing).
 - [Bitrix24 Tasks](#bitrix24-tasks)
 - [Bitrix24 Messenger](#bitrix24-messenger)
 - [Bitrix24 Open Lines](#bitrix24-open-lines)
+- [Bitrix24 Chatbot](#bitrix24-chatbot)
 - [Bitrix24 Trigger](#bitrix24-trigger)
 - [Bitrix24 Messenger Trigger](#bitrix24-messenger-trigger)
+- [Bitrix24 Chatbot Trigger](#bitrix24-chatbot-trigger)
 - [Rate limits](#rate-limits)
 - [Quirks worth knowing](#quirks-worth-knowing)
 - [What was checked](#what-was-checked)
@@ -44,7 +46,9 @@ Requires n8n 2.x and Node 20.19 or newer.
 
 ## Credentials
 
-All seven nodes use **Bitrix24 Webhook API**, built from an inbound webhook.
+Seven of the nine nodes use **Bitrix24 Webhook API**, built from an inbound webhook. The chatbot
+node and its trigger use **Bitrix24 Chatbot Webhook API**: the same fields plus a bot token, see
+[below](#bitrix24-chatbot-webhook-api).
 
 Create the webhook in Bitrix24 under **Developer resources → Other → Inbound webhook** and tick
 the permissions the workflows need: `crm` for the CRM node; `task`, `tasks` and `sonet_group`
@@ -73,6 +77,26 @@ Pasting the whole URL works: only the tail is kept, and the host in it is ignore
 The credential is pinned out of the HTTP Request node (`Allowed HTTP Request Domains` is fixed
 to none), and it has no `authenticate` block, so even a credential selected there would add
 nothing to a request.
+
+### Bitrix24 Chatbot Webhook API
+
+Through a webhook, Bitrix24 tells bots apart by `botToken`: a string you make up when the bot is
+registered and send with every later call. Whoever has the webhook and the token can act as the
+bot, so the token is a secret, and it lives in the credential rather than in a node parameter,
+where it would travel inside every exported workflow.
+
+- The webhook needs the `imbot` permission, plus `im` if a bot should also read the webhook user's
+  own events.
+- **Bot Token**: up to 40 characters; the documentation announces that registration refuses longer
+  ones from 06.08.2026, and the node refuses them already. 32 random letters and digits from a
+  password generator do.
+- Keep the token once a bot is registered with it. Another token cannot reach that bot, and the
+  node does not offer rotating it: the new token would have to be typed into a workflow.
+- One token can hold several bots. Every operation picks the bot from a list of the token's bots.
+
+**Test** calls `imbot.v2.Revision.get`, which checks the portal, the webhook and its `imbot`
+permission. It cannot check the token: before a bot is registered with it, any token is as good
+as another.
 
 ## Bitrix24 node
 
@@ -339,9 +363,90 @@ IDs, split into the batches Bitrix24 allows); client ratings; the current load o
 is at most 366 days. These methods need access to open channel reports on the plan and for the user.
 
 **Bot Dialog** acts for a chatbot connected to a line. Through a webhook Bitrix24 must be told which
-bot: give the `botToken` it was registered with in `imbot.v2`.
+bot: give the `botToken` it was registered with in `imbot.v2`, the Bot Token of the Bitrix24 Chatbot
+Webhook API credential.
 
 Connectors (`imconnector.*`) are not here: Bitrix24 does not let a webhook call them.
+
+## Bitrix24 Chatbot
+
+A bot of your own in the Bitrix24 messenger (Chatbots 2.0, `imbot.v2`): it has its own name and
+avatar, people write to it privately or mention it in group chats, and it answers with text,
+cards, buttons and files. Everything it sends comes from the bot, not from the webhook user.
+
+| Resource | Operations |
+|---|---|
+| **Message** | Send, Update, Delete, Mark as Read, Get, Get Context, Add Reaction, Remove Reaction |
+| **Chat** | Create, Get, Update, Leave, Set Owner, Add Managers, Remove Managers, Show Activity Indicator, Set Input Field |
+| **Chat Member** | Add, Remove, Get Many |
+| **Command** | Register, Update, Get Many, Unregister, Answer |
+| **File** | Upload, Download |
+| **Bot** | Register, Get, Get Many, Update, Unregister, Get API Revision |
+| **Event** | Get Many |
+
+### Getting a bot going
+
+1. Create the **Bitrix24 Chatbot Webhook API** credential with a token of your own.
+2. Run **Bot → Register** once, with a code such as `support_bot` and a name. Registering the same
+   code again returns the existing bot unchanged, so leaving this node in a workflow does no harm.
+3. Put a **Bitrix24 Chatbot Trigger** on the bot, and answer with **Message → Send** to the
+   `chat.dialogId` of the event.
+
+A conversation is a **Dialog ID**: `chat123` for group chat 123, or a user ID such as `7` for the
+private chat of the bot with user 7. In an event from a private chat, `chat.dialogId` is already the
+other person's ID, so it goes straight back into Send.
+
+### Bot types
+
+**Type** is set at registration and cannot be changed later.
+
+- **Bot** gets every message of its private chats, and in group chats only the messages that mention
+  it (`[USER=<bot id>]…[/USER]`). This is the one most bots need.
+- **Supervisor** and **Personal Assistant** get every message of every chat they are in, and only
+  they may read with **Message → Get** and **Get Context**. A plain bot asking gets
+  `BOT_TYPE_NOT_ALLOWED`. Get Context returns up to 50 messages on each side of one, with authors,
+  which is what an AI agent needs to see the conversation.
+- **Open Channel Bot** answers clients in open channels and otherwise behaves like Bot.
+
+### Buttons and commands
+
+**Keyboard (JSON)** puts buttons under a message. A button with `LINK` opens a page, one with
+`ACTION` inserts or sends text on the person's side, and one with `COMMAND` runs a slash command of
+the bot:
+
+```json
+[{"TEXT": "Talk to a manager", "COMMAND": "manager", "COMMAND_PARAMS": "sales", "BLOCK": "Y"},
+ {"TYPE": "NEWLINE"},
+ {"TEXT": "Price list", "LINK": "https://example.com/prices"}]
+```
+
+The command has to exist: **Command → Register** it first (`manager`, with a title for the command
+list). Typing `/manager` and pressing the button both arrive as a **Command Called** event; the
+event's `command.context` says which, `textarea` or `keyboard`. **Command → Answer** replies in the
+chat the command came from. According to the documentation that works even in a chat the bot is not
+in, as a system line; on the test portal only answers in the bot's own chats were tried.
+
+The node adds the bot's ID to every keyboard it sends, because Bitrix24 warns that an updated
+keyboard without one may send the press to the wrong bot.
+
+**Chat → Set Input Field** turns typing off in a chat, so people can only press buttons.
+**Show Activity Indicator** shows "typing…" or an agent status such as "Agent is searching for
+information…" for up to 600 seconds while a workflow prepares the answer.
+
+### Events and files
+
+**Event → Get Many** reads the bot's queue by hand; the trigger does the same on a schedule. Passing
+an offset deletes the events before it for every reader of that bot. **Include Webhook User Events**
+adds the webhook user's own messenger events (`ONIMV2…`) to the same read; that needs the `im`
+permission and **Bitrix24 Messenger → Event Queue → Subscribe** first.
+
+**File → Download** puts a chat file into binary data. The one-time link Bitrix24 hands out for it
+contains the webhook code, as it does in the messenger node, so it is fetched inside the operation
+and never shown.
+
+**Bot → Update** changes the name, profile, flags and background, and can switch **Event Delivery**
+to a webhook URL of your own. Bitrix24 then posts each event there with an OAuth token of the bot
+inside, and does not retry a failed delivery. The trigger needs the default, **Keep for Polling**.
 
 ## Bitrix24 Trigger
 
@@ -385,6 +490,25 @@ does not unsubscribe; **Messenger → Event Queue → Unsubscribe** does.
 
 On the test portal an edit made through the REST API did not reach the queue, while new messages,
 reactions and deletions did. Edits made in the Bitrix24 apps were not tried.
+
+## Bitrix24 Chatbot Trigger
+
+Starts a workflow on messages to a bot, slash commands and button presses, reactions to the bot's
+messages, the bot being added to a chat, and a chat opened through a link with `BOT_CONTEXT` data.
+It polls the bot's event queue on n8n's schedule, so it works on an n8n without a public address.
+
+- **Events** defaults to New Message and Command Called.
+- On activation it checks that the bot keeps its events for polling, and fails with the reason if the
+  bot posts them to a URL instead. Then it skips whatever is already queued, so turning the workflow
+  on does not answer a backlog.
+- Messages, commands and reactions of bots, the bot itself included, are dropped unless **Include
+  Events From Bots** is on. Two bots in one chat cannot talk to each other forever that way.
+- **Dialog IDs** narrows it to some conversations.
+- A manual test run reads what is queued without confirming it.
+
+Each event is one item: `eventId`, `type`, `date`, and the event's own data — `message`, `chat`,
+`user`, and `command` or `reaction` where they apply. Bitrix24 keeps one queue per bot: a second
+workflow reading the same bot takes events away from this one.
 
 ## Rate limits
 
@@ -487,6 +611,22 @@ Messenger and open lines:
 - `imconnector.*` does not work with webhooks at all (stated in the documentation), so custom
   open channel connectors need an application.
 
+Chatbots:
+
+- A bot's chat background cannot be reset to each person's own once it is set. The documentation
+  says `null` resets it and an unknown value becomes `null`; on the test portal `null`, an empty
+  string and an unknown value all left it as it was. The node offers no reset.
+- `imbot.v2.Command.list` returns the messenger's six built-in commands (`/me` and others, bot ID
+  `0`, IDs like `def0`) together with the bot's own. **Command → Get Many** leaves them out unless
+  **Include Built-In Commands** is on.
+- A system line the bot sent (`authorId` 0) cannot be deleted by the bot, and not by the chat owner
+  either: `CANT_EDIT_MESSAGE`.
+- The same reaction twice is `REACTION_ALREADY_SET`, not a quiet success.
+- The bot's own edits reach its own queue as Message Edited events, unlike REST edits in the
+  messenger queue. The trigger drops them with the other bot events.
+- In a response with no forwarded messages, `uuidMap` is an empty array; the node turns it into an
+  empty object, the shape it has with forwards.
+
 ## What was checked
 
 On a live production portal, 14.09.2026, through a harness that runs the compiled nodes with a
@@ -536,10 +676,10 @@ left; Bitrix24 has no way to delete a chat.
 
 | Bitrix24 Messenger | Operations |
 |---|---|
-| Write, checked | 28 |
+| Write, checked | 29 |
 | Read, checked | 23 |
 | Works, with a Bitrix24 limitation | 5 |
-| Not run: would touch every real chat, create a feed post, or needs a bot or another person | 7 |
+| Not run: would touch every real chat, create a feed post, or needs another person | 6 |
 
 The open lines node read line settings, CRM chats and statistics, and created, changed and deleted
 an inactive test line. Dialogs, operator actions, CRM chat writes and bot dialogs work on
@@ -558,6 +698,29 @@ them. The Message Edited option of the trigger now says that REST edits did not 
 The Messenger Trigger was run on the same chat: the first poll skips what is queued, a manual run
 confirms nothing, the dialog filter and the own-message filter work.
 
+The chatbot node was checked on 15.09.2026 with two hidden test bots marked `[n8n-test]`, a plain
+one and a supervisor, registered with a token made for the run. The bot created a group chat with
+the webhook user as the only person in it, and the webhook user produced the events: private
+messages, a message with and without a mention, a typed command, a button press, a like, an edit, a
+chat opened with context. The guard let no webhook URL be set and no token rotated. At the end the
+messages, the command and both bots were deleted and the chat was left; one system line of the bot
+stays in it, since Bitrix24 lets nobody delete it. Every output was checked for the webhook code and
+for the bot token.
+
+| Bitrix24 Chatbot | Operations |
+|---|---|
+| Write, checked | 21 |
+| Read, checked | 7 |
+| Works, with a Bitrix24 limitation | 6 |
+
+The same run pressed a bot button through **Bitrix24 Messenger → Message → Run Bot Command**, which
+had waited for a bot since 0.3.0. The Chatbot Trigger was run on the plain bot: the delivery mode
+check, skipping the queue on activation, a manual run, the dialog filter, dropping bot messages and
+not delivering an event twice. Its refusal of a bot in webhook mode was checked on a faked answer.
+
+Those runs changed the chatbot node before this version: the background reset option was removed,
+Command → Get Many filters out built-in commands, and Send without forwards returns an empty object.
+
 The trigger was fed hand-made deliveries (10 checks, including a wrong token and `__proto__`
 keys) and fetched a real deal. A delivery from Bitrix24 itself needs an n8n with a public
 address. Offline, every operation runs with sample parameters, and every method the nodes call
@@ -567,8 +730,8 @@ exists in the documentation.
 
 - Nodes for drive, calendar, telephony, business processes and lists, the store and catalog,
   sites, booking, mail and BI. Until then, the Bitrix24 node calls their methods directly.
-- Chatbots 2.0 (`imbot.v2`): registering a bot and answering as it. The API works with webhooks and
-  has a polling mode, so it fits n8n; it is a separate node still to come.
+- A chatbot trigger for bots that post their events to a webhook URL. The polling trigger covers
+  every event; a webhook one would save the polling delay on an n8n with a public address.
 - In the tasks node: legacy task comments (`task.commentitem.*`, gone from the new task card) and a
   trigger read of the changed task like the one the trigger does for CRM records.
 - An OAuth2 credential for a local application, and with it everything Bitrix24 reserves for

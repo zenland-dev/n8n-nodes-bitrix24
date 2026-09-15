@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.4.0 — 15.09.2026
+
+- **Bitrix24 Chatbot**, a new node on Chatbots 2.0 (`imbot.v2`): 34 operations across 7 resources.
+  Registering, changing and deleting bots of four types; messages with attachments, keyboards,
+  replies and forwards, reactions and read marks; reading a message and the messages around it
+  (supervisor and personal assistant bots); group chats the bot creates, their members, managers
+  and owner; the activity indicator and turning typing off; slash commands and answers to them;
+  files uploaded from binary data and downloaded into it; the bot's event queue.
+- **Bitrix24 Chatbot Trigger**, a new polling trigger: messages to the bot, commands and button
+  presses, reactions, being added to a chat and a chat opened with context. It refuses a bot that
+  posts its events to a URL.
+- **Bitrix24 Chatbot Webhook API**, a new credential: the webhook fields plus the bot token, so the
+  token stays out of workflow parameters. Tokens over 40 characters are refused.
+- Checked on a live portal: all 34 chatbot operations and the trigger, with hidden test bots. The
+  messenger's Message → Run Bot Command, left unchecked in 0.3.0, was checked on a test bot too.
+- The download code of the messenger node moved into `shared/`, and the transport can take its
+  portal from either credential. No change to any published parameter, operation or credential.
+
 ## 0.3.0 — 14.09.2026
 
 - **Bitrix24 Messenger**, a new node: 63 operations across 10 resources. Messages with

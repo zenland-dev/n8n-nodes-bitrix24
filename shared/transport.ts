@@ -23,6 +23,9 @@ export type Bitrix24Context =
 
 export const WEBHOOK_CREDENTIAL = 'bitrix24WebhookApi';
 
+/** The webhook credential with a chatbot token next to it, for the chatbot nodes. */
+export const CHATBOT_CREDENTIAL = 'bitrix24ChatbotWebhookApi';
+
 export interface Bitrix24RequestOptions {
 	/** Call REST 3.0 (`/rest/api/…`) instead of the classic REST. */
 	v3?: boolean;
@@ -30,6 +33,8 @@ export interface Bitrix24RequestOptions {
 	maxAttempts?: number;
 	/** Item the call is made for, so an error points at it. */
 	itemIndex?: number;
+	/** The credential type to take the portal and webhook from. */
+	credentialType?: string;
 }
 
 /** A method name as Bitrix24 spells them. Anything else never reaches the URL. */
@@ -52,8 +57,8 @@ interface PortalConnection {
 	requestsPerSecond: number;
 }
 
-async function resolvePortal(this: Bitrix24Context): Promise<PortalConnection> {
-	const credentials = await this.getCredentials(WEBHOOK_CREDENTIAL);
+async function resolvePortal(this: Bitrix24Context, credentialType: string): Promise<PortalConnection> {
+	const credentials = await this.getCredentials(credentialType);
 
 	// Rebuilt from the credential fields rather than taken as typed: the domain
 	// dropdown is only an editor hint, and stored values reach us through the
@@ -75,8 +80,8 @@ async function resolvePortal(this: Bitrix24Context): Promise<PortalConnection> {
 }
 
 /** Identifies the portal for caches, without exposing the webhook token. */
-export async function portalKey(this: Bitrix24Context): Promise<string> {
-	const credentials = await this.getCredentials(WEBHOOK_CREDENTIAL);
+export async function portalKey(this: Bitrix24Context, credentialType = WEBHOOK_CREDENTIAL): Promise<string> {
+	const credentials = await this.getCredentials(credentialType);
 	return portalBaseUrl(credentials);
 }
 
@@ -111,7 +116,7 @@ export async function bitrix24Request(
 		});
 	}
 
-	const portal = await resolvePortal.call(this);
+	const portal = await resolvePortal.call(this, options.credentialType ?? WEBHOOK_CREDENTIAL);
 	const url = options.v3
 		? `${portal.baseUrl}/rest/api/${portal.token}/${method}`
 		: `${portal.baseUrl}/rest/${portal.token}/${method}.json`;

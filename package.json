@@ -1,7 +1,7 @@
 {
 	"name": "@zenland-dev/n8n-nodes-bitrix24",
-	"version": "0.3.0",
-	"description": "Bitrix24 nodes for n8n: CRM, tasks and workgroups, messenger and open lines, any REST method, batches, a webhook trigger and a messenger trigger",
+	"version": "0.4.0",
+	"description": "Bitrix24 nodes for n8n: CRM, tasks and workgroups, messenger and open lines, chatbots, any REST method, batches, a webhook trigger and polling triggers for chats and bots",
 	"keywords": [
 		"n8n-community-node-package",
 		"n8n",
@@ -12,7 +12,9 @@
 		"messenger",
 		"chat",
 		"open lines",
-		"contact center"
+		"contact center",
+		"chatbot",
+		"bot"
 	],
 	"license": "MIT",
 	"homepage": "https://github.com/zenland-dev/n8n-nodes-bitrix24",
@@ -47,10 +49,13 @@
 		"n8nNodesApiVersion": 1,
 		"strict": true,
 		"credentials": [
+			"dist/credentials/Bitrix24ChatbotWebhookApi.credentials.js",
 			"dist/credentials/Bitrix24WebhookApi.credentials.js"
 		],
 		"nodes": [
 			"dist/nodes/Bitrix24/Bitrix24.node.js",
+			"dist/nodes/Bitrix24Chatbot/Bitrix24Chatbot.node.js",
+			"dist/nodes/Bitrix24ChatbotTrigger/Bitrix24ChatbotTrigger.node.js",
 			"dist/nodes/Bitrix24Crm/Bitrix24Crm.node.js",
 			"dist/nodes/Bitrix24Messenger/Bitrix24Messenger.node.js",
 			"dist/nodes/Bitrix24MessengerTrigger/Bitrix24MessengerTrigger.node.js",
