@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.7.0 — 16.09.2026
+
+- **Bitrix24 Employees**, a new node: 32 operations across 6 resources. Employees found by any field
+  of their card or by one search phrase, invited, updated and dismissed; custom fields of the card;
+  the classic company structure of departments; the working day opened, paused and closed, with its
+  settings and schedules; the time control module — a month of worked hours, who may read whose
+  reports, and the portal settings behind it; the office address ranges.
+- Employee filters are sent flat, the way `user.get` and `department.get` read them, so any field
+  can be filtered with a comparison in front of its name.
+- Checked on a live portal: 20 reading operations as they are, the writing ones on the webhook user
+  alone — a test department with nobody in it, a custom field of the run, one field of that user's
+  own card put back afterwards, and that user's own working day. Nobody else was touched; an
+  invitation was not sent to anyone.
+- Not included: the newer `humanresources.*` org structure, which answers `ERROR_METHOD_NOT_FOUND`
+  on a portal without it, and `timeman.record.*`, which answers the same.
+- No change to any published parameter, operation or credential of the other nodes.
+
 ## 0.6.0 — 16.09.2026
 
 - **Bitrix24 Calendar**, a new node: 21 operations across 4 resources, one per documented

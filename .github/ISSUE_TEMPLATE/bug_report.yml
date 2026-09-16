@@ -42,6 +42,7 @@ body:
         - Bitrix24 Chatbot Trigger
         - Bitrix24 Drive
         - Bitrix24 Calendar
+        - Bitrix24 Employees
     validations:
       required: true
 

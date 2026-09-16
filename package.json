@@ -1,7 +1,7 @@
 {
 	"name": "@zenland-dev/n8n-nodes-bitrix24",
-	"version": "0.6.0",
-	"description": "Bitrix24 nodes for n8n: CRM, tasks and workgroups, calendar and resource booking, messenger and open lines, chatbots, Drive files and folders, any REST method, batches, a webhook trigger and polling triggers for chats and bots",
+	"version": "0.7.0",
+	"description": "Bitrix24 nodes for n8n: CRM, tasks and workgroups, calendar and resource booking, employees and company structure, messenger and open lines, chatbots, Drive files and folders, any REST method, batches, a webhook trigger and polling triggers for chats and bots",
 	"keywords": [
 		"n8n-community-node-package",
 		"n8n",
@@ -19,7 +19,10 @@
 		"chatbot",
 		"bot",
 		"drive",
-		"files"
+		"files",
+		"employees",
+		"hr",
+		"time tracking"
 	],
 	"license": "MIT",
 	"homepage": "https://github.com/zenland-dev/n8n-nodes-bitrix24",
@@ -64,6 +67,7 @@
 			"dist/nodes/Bitrix24ChatbotTrigger/Bitrix24ChatbotTrigger.node.js",
 			"dist/nodes/Bitrix24Crm/Bitrix24Crm.node.js",
 			"dist/nodes/Bitrix24Drive/Bitrix24Drive.node.js",
+			"dist/nodes/Bitrix24Employees/Bitrix24Employees.node.js",
 			"dist/nodes/Bitrix24Messenger/Bitrix24Messenger.node.js",
 			"dist/nodes/Bitrix24MessengerTrigger/Bitrix24MessengerTrigger.node.js",
 			"dist/nodes/Bitrix24OpenLines/Bitrix24OpenLines.node.js",

@@ -3,16 +3,16 @@
 n8n community nodes for [Bitrix24](https://www.bitrix24.com): a CRM node with 268 operations
 across 42 resources, a tasks node with 129 operations across 17 resources, a messenger node with
 63 operations, an open lines node with 43, a Drive node with 36, a chatbot node with 34, a calendar
-node with 21, a node that calls any of the ~1400 REST methods by name or in batches, a trigger for
-outgoing webhooks, and two triggers that need no public URL: one for chat messages, one for
-messages and commands sent to a bot.
+node with 21, an employees node with 32, a node that calls any of the ~1400 REST methods by name or
+in batches, a trigger for outgoing webhooks, and two triggers that need no public URL: one for chat
+messages, one for messages and commands sent to a bot.
 
 Written from scratch against the official REST documentation
 ([bitrix24/b24restdocs](https://github.com/bitrix24/b24restdocs), read on 14.09.2026). No code
 from any other package.
 
-**Status: 0.6.0.** Every operation of the CRM, Drive, chatbot and calendar nodes was run against a
-live Bitrix24 portal, 116 of the 129 of the tasks node, 57 of the 63 of the messenger node and 14 of the 43 of
+**Status: 0.7.0.** Every operation of the CRM, Drive, chatbot and calendar nodes was run against a
+live Bitrix24 portal, 29 of the 32 of the employees node, 116 of the 129 of the tasks node, 57 of the 63 of the messenger node and 14 of the 43 of
 the open lines node: reads as they are, writes on objects the test created and deleted. What was not run, and
 why, is under [What was checked](#what-was-checked). Operations that work with a limitation of
 Bitrix24 itself are listed under [Quirks](#quirks-worth-knowing).
@@ -27,6 +27,7 @@ Bitrix24 itself are listed under [Quirks](#quirks-worth-knowing).
 - [Bitrix24 Chatbot](#bitrix24-chatbot)
 - [Bitrix24 Drive](#bitrix24-drive)
 - [Bitrix24 Calendar](#bitrix24-calendar)
+- [Bitrix24 Employees](#bitrix24-employees)
 - [Bitrix24 Trigger](#bitrix24-trigger)
 - [Bitrix24 Messenger Trigger](#bitrix24-messenger-trigger)
 - [Bitrix24 Chatbot Trigger](#bitrix24-chatbot-trigger)
@@ -669,6 +670,77 @@ Update keeps the settings you leave out: writing one flag left every other key o
 as it was. **Settings (JSON)** covers what has no field of its own, `defaultReminders` and
 `defaultSections`.
 
+## Bitrix24 Employees
+
+The people on the portal and what surrounds them: the employee card, the company structure, the
+working day and the time reports. The webhook needs the `user` permission, plus `department` for
+the structure and `timeman` for working time.
+
+| Resource | Operations |
+|---|---|
+| **Employee** | Get, Get Many, Search, Get Current, Invite, Update, Get Fields |
+| **Custom Field** | Create, Get Many, Update, Delete |
+| **Department** | Create, Get, Get Many, Update, Delete, Get Fields |
+| **Working Day** | Open, Close, Pause, Get Status, Get Settings, Get Schedule |
+| **Work Time Report** | Explain an Absence, Get Reports, Get Report Employees, Get Report Access, Get Settings, Update Settings |
+| **Office Network** | Get Many, Set, Check |
+
+### Turning a person into an ID
+
+Every other Bitrix24 node asks for employees as numbers: the responsible person of a task, the
+participants of an event, the head of a department. **Employee → Get Many** and **Search** are what
+turn an email, a name or a department into that number.
+
+The two differ in how they look. **Get Many** filters on fields — exact values, with a comparison
+in front of the field name, and any field of the card, including custom ones. **Search** takes one
+phrase and looks through the first name, last name, job title and department name at once, or those
+fields one by one; Bitrix24 refuses the two ways together, and so does the node.
+
+The filter of **Get Many** is flat: `ACTIVE`, `UF_DEPARTMENT` and the rest sit next to `sort` and
+`select`, not inside a `filter` object the way CRM writes them. **Filter (JSON)** follows that,
+so a comparison goes into the key: `{">LAST_LOGIN": "2026-01-01T00:00:00+03:00"}`.
+
+Both methods leave out bots, mail users, extranet users and Open Channel accounts, so an ID that
+belongs to one of those comes back as nothing found. **Fields to Return** makes the call faster: a
+list without custom fields skips loading them altogether.
+
+### Writing to people
+
+**Invite** creates an employee and sends them the standard invitation email — a real letter to a
+real address, and one more seat on the plan. **Update** changes a card, and *Active* off in it is
+what Bitrix24 calls dismissal. Both need a webhook made by an administrator.
+
+**Custom Field** adds a field to the card of every employee at once, and Bitrix24 upper-cases its
+code and puts `UF_USR_` in front: `BADGE` is stored as `UF_USR_BADGE`, and that longer name is what
+Get Many and the employee card return. Whether the field holds one value or several is decided when
+it is created and cannot be changed afterwards.
+
+### Company structure
+
+**Department** is the classic company structure: a tree with one top-level department, a head per
+department and any depth below. Employees belong to departments through their `UF_DEPARTMENT`, so
+moving somebody is an **Employee → Update**, not a department operation.
+
+The node does not cover the newer `humanresources.*` org structure that Bitrix24 is moving to —
+those 24 methods answer `ERROR_METHOD_NOT_FOUND` on a portal without it, and there was nowhere to
+check them. Adding them later breaks nothing, since they would be new operations.
+
+### Working time
+
+**Working Day** is the timesheet of one person: Open starts the day, Pause puts it on a break, Open
+again continues it, Close ends it. The API writes into a real timesheet and has no way to remove an
+entry afterwards, so a day opened by mistake stays in the reports. Times other than now need a
+reason, unless the employee has a flexible schedule — that is Bitrix24's own rule, not the node's.
+
+**Work Time Report** is the time control module: a month of an employee with every working day, how
+long it lasted against the schedule, and the absences recorded in it. The days sit inside `report`
+in the answer, not at the top. **Get Report Access** says whether the module is on at all and whose
+reports the webhook user may read.
+
+**Office Network** holds the address ranges that count as the office. **Set** replaces the whole
+list — whatever is not in the request stops being the office — so read the current ranges first and
+send them back together with the new one.
+
 ## Bitrix24 Trigger
 
 Starts a workflow when Bitrix24 posts an outgoing webhook.
@@ -866,6 +938,23 @@ Calendar:
 - `calendar.user.settings.set` keeps the keys it is not given: writing one flag left every other
   setting of a live account untouched.
 
+Employees, structure and working time:
+
+- `user.get` and `user.search` take their filter flat, in the body itself, not inside a `filter`
+  object. The same goes for `department.get`.
+- Both leave out bots, mail users, extranet users and Open Channel accounts, so those IDs simply
+  return nothing.
+- A custom field of the employee card is stored under `UF_USR_` plus the upper-cased code, and that
+  longer name is what every read returns.
+- `timeman.record.*` and the whole `humanresources.*` group answer `ERROR_METHOD_NOT_FOUND` on a
+  portal that does not have the newer org structure, so the node has no operations for them.
+- `timeman.timecontrol.settings.get` answers in lower case (`minimum_idle_for_report`) while
+  `settings.set` takes upper case (`MINIMUM_IDLE_FOR_REPORT`). In the same settings `ACTIVE: false`
+  does not switch the module off — only `0` does, which is what the node sends.
+- A working day cannot be removed once written: there is no delete method for a timesheet entry.
+- `timeman.networkrange.set` replaces the whole list of office ranges and answers `false` with the
+  ranges it did not understand, rather than an error.
+
 Chatbots:
 
 - A bot's chat background cannot be reset to each person's own once it is set. The documentation
@@ -1016,6 +1105,28 @@ time zone that go with them, the all-day form, the recurrence rule, the particip
 event into a meeting, the two ways of filtering bookings, and the settings Bitrix24 spells as `Y`
 and `N`.
 
+The employees node was checked on 16.09.2026: 20 reading operations against the portal as it is,
+and the writing ones on the webhook user alone — a department created for the run with nobody in it, a custom
+field of the run, one harmless field of that user's own card with the value put back, and that
+user's own working day opened, paused and closed. The two portal settings were written back exactly
+as they had been read. No other employee was touched.
+
+| Bitrix24 Employees | Operations |
+|---|---|
+| Write, checked | 6 |
+| Read, checked | 16 |
+| Works, with a Bitrix24 limitation | 7 |
+| Not checked: an invitation emails a real person; explaining an absence needs the time control module switched on with an absence already recorded; a work schedule ID is only visible in the portal interface | 3 |
+
+The seven with a limitation are the ones that could only be checked on the webhook user itself or
+written back unchanged: Update of a card, the three working-day operations, the time report of that
+one person, and the two portal settings. Their code is the same whoever it runs for, but a live
+check on somebody else would have meant changing somebody else's data.
+
+Besides that, 23 offline checks read the request each operation builds: the flat filter, the field
+list, dismissal as `ACTIVE: N`, ATOM times for the timesheet, the settings Bitrix24 spells in two
+cases at once, and the refusals the node makes on its own.
+
 The trigger was fed hand-made deliveries (10 checks, including a wrong token and `__proto__`
 keys) and fetched a deal. A delivery from Bitrix24 itself needs an n8n with a public
 address. Offline, every operation runs with sample parameters, and every method the nodes call
@@ -1024,7 +1135,10 @@ exists in the documentation.
 ## What is not here yet
 
 - Nodes for telephony, business processes and lists, the store and catalog,
-  sites, booking, mail and BI. Until then, the Bitrix24 node calls their methods directly.
+  sites, booking, mail, the activity stream and BI. Until then, the Bitrix24 node calls their
+  methods directly.
+- The newer `humanresources.*` org structure, 24 methods Bitrix24 is moving departments to. A
+  portal without it answers `ERROR_METHOD_NOT_FOUND`, so there was nothing to check them against.
 - In the calendar node: clearing the participants of a meeting in one step, which needs a meeting
   flag with an empty list (**Method → Call** does it), and handing an event over to another
   organizer, which Bitrix24 has no method for at all.
