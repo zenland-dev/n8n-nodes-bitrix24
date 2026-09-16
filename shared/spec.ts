@@ -8,6 +8,8 @@ import type {
 import { NodeOperationError } from 'n8n-workflow';
 
 import { asNodeError } from './errors';
+import { credentialSecrets, scrubItems } from './secrets';
+import { WEBHOOK_CREDENTIAL } from './transport';
 
 /**
  * One operation of one resource.
@@ -115,11 +117,22 @@ function errorItem(error: unknown, itemIndex: number): INodeExecutionData {
 	};
 }
 
-/** Runs the selected resource and operation once per input item. */
+/**
+ * Runs the selected resource and operation once per input item.
+ *
+ * Every output passes through scrubItems: a string holding the webhook code or the bot token
+ * of `credentialType` is replaced, whichever operation produced it.
+ */
 export async function executeResources(
 	this: IExecuteFunctions,
 	resources: Resource[],
+	credentialType = WEBHOOK_CREDENTIAL,
 ): Promise<INodeExecutionData[][]> {
+	const secrets = await credentialSecrets(this, credentialType);
+	return [scrubItems(await runOperation.call(this, resources), secrets)];
+}
+
+async function runOperation(this: IExecuteFunctions, resources: Resource[]): Promise<INodeExecutionData[]> {
 	const items = this.getInputData();
 	const resourceValue = this.getNodeParameter('resource', 0) as string;
 	const operationValue = this.getNodeParameter('operation', 0) as string;
@@ -128,7 +141,7 @@ export async function executeResources(
 		.find((r) => r.value === resourceValue)
 		?.operations.find((o) => o.value === operationValue);
 
-	if (operation?.executeAll !== undefined) return [await operation.executeAll.call(this)];
+	if (operation?.executeAll !== undefined) return await operation.executeAll.call(this);
 
 	const execute = operation?.execute;
 	if (execute === undefined) {
@@ -159,5 +172,5 @@ export async function executeResources(
 		}
 	}
 
-	return [output];
+	return output;
 }

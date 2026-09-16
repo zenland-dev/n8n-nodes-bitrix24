@@ -167,7 +167,7 @@ export function messageOptionProperties(kind: 'send' | 'answer'): INodePropertie
 	];
 	if (kind === 'send') {
 		options.push(
-			{ displayName: 'Forward Message IDs', name: 'forwardIds', type: 'string', default: '', placeholder: '4101, 4102', description: 'Messages to forward with this one, up to 100, from chats the bot is in' },
+			{ displayName: 'Forward Message IDs', name: 'forwardIds', type: 'string', default: '', placeholder: '101, 102', description: 'Messages to forward with this one, up to 100, from chats the bot is in' },
 			{ displayName: 'Reply to Message ID', name: 'replyId', type: 'number', default: 0, description: 'A message this one answers, shown quoted above it' },
 		);
 	}

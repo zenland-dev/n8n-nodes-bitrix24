@@ -42,7 +42,7 @@ function groupOptions(forUpdate: boolean): INodeProperties[] {
 	} else {
 		options.push(
 			{ displayName: 'Is Project', name: 'project', type: 'boolean', default: true, description: 'Whether to create a project, with start and end dates, rather than a group' },
-			{ displayName: 'Scrum Master User ID', name: 'scrumMasterId', type: 'number', default: 0, description: 'By the documentation, a scrum master makes the project a scrum. On the test portal Bitrix24 ignored it and created a collab; there, create scrums in Bitrix24 itself.' },
+			{ displayName: 'Scrum Master User ID', name: 'scrumMasterId', type: 'number', default: 0, description: 'By the documentation, a scrum master makes the project a scrum. Bitrix24 may ignore it and create a collab instead (seen on a live portal); then create the scrum in Bitrix24 itself.' },
 			{ displayName: 'Subject ID', name: 'subjectId', type: 'number', default: 0, description: 'Group subject (category) set up on the portal' },
 		);
 	}

@@ -11,7 +11,16 @@ import { NodeOperationError } from 'n8n-workflow';
  */
 export async function downloadToBinary(
 	ctx: IExecuteFunctions,
-	options: { url: string; portal: string; fileId: number; itemIndex: number; binaryProperty: string; json: IDataObject },
+	options: {
+		url: string;
+		portal: string;
+		fileId: number;
+		itemIndex: number;
+		binaryProperty: string;
+		json: IDataObject;
+		/** The name to use when the portal sends no Content-Disposition, e.g. NAME from Drive. */
+		fallbackName?: string;
+	},
 ): Promise<INodeExecutionData> {
 	const { url, portal, fileId, itemIndex } = options;
 	let origin = '';
@@ -37,7 +46,7 @@ export async function downloadToBinary(
 
 	const headers = (response.headers ?? {}) as IDataObject;
 	const buffer = Buffer.from(response.body as ArrayBuffer);
-	const fileName = fileNameFrom(headers['content-disposition']) ?? `file-${fileId}`;
+	const fileName = fileNameFrom(headers['content-disposition']) ?? options.fallbackName ?? `file-${fileId}`;
 	const mimeType = String(headers['content-type'] ?? 'application/octet-stream').split(';')[0];
 	return {
 		json: { ...options.json, fileId, fileName, size: buffer.length },

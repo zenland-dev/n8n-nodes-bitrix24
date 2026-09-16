@@ -49,12 +49,12 @@ const NAMES: Record<number, [name: string, abbr: string]> = {
 	31: ['SMART_INVOICE', 'SI'],
 };
 
-/** LEAD, DEAL, DYNAMIC_1042 — the symbolic type code older methods take. */
+/** LEAD, DEAL, DYNAMIC_1234 — the symbolic type code older methods take. */
 export function entityTypeName(entityTypeId: number): string {
 	return NAMES[entityTypeId]?.[0] ?? `DYNAMIC_${entityTypeId}`;
 }
 
-/** L, D, SI, T412 — the short code product rows and CRM link fields take. Smart processes are T + hex ID. */
+/** L, D, SI, T4d2 — the short code product rows and CRM link fields take. Smart processes are T + hex ID. */
 export function entityTypeAbbr(entityTypeId: number): string {
 	return NAMES[entityTypeId]?.[1] ?? `T${entityTypeId.toString(16)}`;
 }

@@ -21,7 +21,7 @@ body:
     attributes:
       label: Where it is documented
       description: >
-        A link to apidocs.bitrix24.com. Tasks, messenger, drive, calendar, telephony, open
-        channels, business processes, the store, sites, booking and mail have no node yet;
+        A link to apidocs.bitrix24.com. Calendar, telephony, business processes, the store,
+        sites, booking and mail have no node yet;
         until they do, the Bitrix24 node calls their methods by name. Say which module you
         need first.

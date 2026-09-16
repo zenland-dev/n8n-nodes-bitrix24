@@ -7,6 +7,7 @@ import type {
 } from 'n8n-workflow';
 import { NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
 
+import { credentialSecrets, scrubItems } from '../../shared/secrets';
 import { CHATBOT_CREDENTIAL } from '../../shared/transport';
 import { loadOptions } from '../Bitrix24Chatbot/methods';
 import { botIdProperty, botRequest } from '../Bitrix24Chatbot/shared/bot';
@@ -161,6 +162,6 @@ export class Bitrix24ChatbotTrigger implements INodeType {
 			.filter((item) => includeBots || actor(item).bot !== true);
 
 		if (items.length === 0) return null;
-		return [items.map((json) => ({ json }))];
+		return [scrubItems(items.map((json) => ({ json })), await credentialSecrets(this, CHATBOT_CREDENTIAL))];
 	}
 }

@@ -60,6 +60,6 @@ export class Bitrix24Chatbot implements INodeType {
 	methods = { loadOptions };
 
 	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
-		return await executeResources.call(this, resources);
+		return await executeResources.call(this, resources, CHATBOT_CREDENTIAL);
 	}
 }

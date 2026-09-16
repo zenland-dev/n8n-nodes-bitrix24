@@ -34,6 +34,13 @@ body:
         - Bitrix24 (Method, Batch, Portal)
         - Bitrix24 CRM
         - Bitrix24 Trigger
+        - Bitrix24 Tasks
+        - Bitrix24 Messenger
+        - Bitrix24 Messenger Trigger
+        - Bitrix24 Open Lines
+        - Bitrix24 Chatbot
+        - Bitrix24 Chatbot Trigger
+        - Bitrix24 Drive
     validations:
       required: true
 

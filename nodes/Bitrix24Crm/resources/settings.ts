@@ -22,7 +22,7 @@ export const pipelineResource: Resource = {
 		listKey: 'categories',
 		minId: 0,
 		listParams: [],
-		fieldsExample: '{"name": "Partners", "sort": 500}',
+		fieldsExample: '{"name": "Wholesale", "sort": 500}',
 		descriptions: {
 			create: 'Create a pipeline; Bitrix24 gives it the default set of stages',
 			delete: 'Delete a pipeline. Bitrix24 refuses while it still holds records.',
@@ -37,7 +37,7 @@ const statusOperations: Operation[] = [
 		plural: 'reference entries',
 		listIdField: 'ID',
 		listParams: ['filter', 'order'],
-		fieldsExample: '{"ENTITY_ID": "SOURCE", "STATUS_ID": "PARTNER", "NAME": "Partner", "SORT": 100}',
+		fieldsExample: '{"ENTITY_ID": "SOURCE", "STATUS_ID": "TRADE_SHOW", "NAME": "Trade show", "SORT": 100}',
 		descriptions: {
 			create: 'Add an entry to a reference book — a stage, a source, a contact type…',
 			getMany: 'List entries of reference books; filter by ENTITY_ID, e.g. {"ENTITY_ID": "DEAL_STAGE_3"}',
@@ -87,7 +87,7 @@ export const smartProcessTypeResource: Resource = {
 			resultKey: 'type',
 			listKey: 'types',
 			listParams: ['filter', 'order'],
-			fieldsExample: '{"title": "Applications", "isCategoriesEnabled": "Y", "isStagesEnabled": "Y"}',
+			fieldsExample: '{"title": "Projects", "isCategoriesEnabled": "Y", "isStagesEnabled": "Y"}',
 			descriptions: {
 				get: 'Retrieve a smart process type by its own ID (not the entity type ID)',
 				delete: 'Delete a smart process type. Bitrix24 refuses while it still holds items.',
@@ -134,7 +134,7 @@ const customFieldOperations: Operation[] = [
 			},
 		],
 		listParams: ['filter', 'order'],
-		fieldsExample: '{"FIELD_NAME": "PARTNER_CODE", "USER_TYPE_ID": "string", "EDIT_FORM_LABEL": {"en": "Partner code"}}',
+		fieldsExample: '{"FIELD_NAME": "PROMO_CODE", "USER_TYPE_ID": "string", "EDIT_FORM_LABEL": {"en": "Promo code"}}',
 		descriptions: {
 			create: 'Create a custom field. Bitrix24 prefixes the name with UF_CRM_.',
 			delete: 'Delete a custom field together with every value stored in it',
@@ -193,7 +193,7 @@ export const currencyResource: Resource = {
 			idType: 'string',
 			idKeys: { update: 'ID' },
 			listParams: ['order'],
-			fieldsExample: '{"CURRENCY": "AED", "AMOUNT": 21.5, "AMOUNT_CNT": 1, "SORT": 500}',
+			fieldsExample: '{"CURRENCY": "GBP", "AMOUNT": 1.17, "AMOUNT_CNT": 1, "SORT": 500}',
 			descriptions: { get: 'Retrieve a currency by its code, e.g. EUR' },
 		}),
 		{
@@ -275,7 +275,7 @@ export const automatedSolutionResource: Resource = {
 		resultKey: 'automatedSolution',
 		listKey: 'automatedSolutions',
 		listParams: ['filter', 'order'],
-		fieldsExample: '{"title": "Visa Desk", "typeIds": [1030, 1034]}',
+		fieldsExample: '{"title": "Project Office", "typeIds": [1100, 1102]}',
 	}),
 };
 

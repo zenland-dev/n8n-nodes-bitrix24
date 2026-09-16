@@ -1,0 +1,36 @@
+{
+	"node": "@zenland-dev/n8n-nodes-bitrix24.bitrix24Drive",
+	"nodeVersion": "1.0",
+	"codexVersion": "1.0",
+	"categories": ["Data & Storage"],
+	"resources": {
+		"credentialDocumentation": [
+			{
+				"url": "https://github.com/zenland-dev/n8n-nodes-bitrix24?tab=readme-ov-file#credentials"
+			}
+		],
+		"primaryDocumentation": [
+			{
+				"url": "https://github.com/zenland-dev/n8n-nodes-bitrix24?tab=readme-ov-file#bitrix24-drive"
+			}
+		]
+	},
+	"alias": [
+		"Bitrix24",
+		"Bitrix",
+		"Битрикс24",
+		"Битрикс",
+		"Drive",
+		"Диск",
+		"File",
+		"Файл",
+		"Folder",
+		"Папка",
+		"Upload",
+		"Загрузить",
+		"Download",
+		"Скачать",
+		"Public Link",
+		"Публичная ссылка"
+	]
+}

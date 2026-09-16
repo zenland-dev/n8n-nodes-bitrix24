@@ -119,7 +119,7 @@ export const commandResource: Resource = {
 				const body = await botRequest.call(this, 'imbot.v2.Command.list', { botId }, itemIndex);
 				const commands = (body.result as IDataObject | null)?.commands;
 				const all = Array.isArray(commands) ? (commands as IDataObject[]) : [];
-				// On a live portal the list held six built-in commands (botId 0) next to the bot's own.
+				// The list also holds the messenger's built-in commands, with botId 0, next to the bot's own.
 				const includeBuiltIn = this.getNodeParameter('includeBuiltIn', itemIndex, false) === true;
 				return all.filter((c) => Number(c.botId) === botId || (includeBuiltIn && Number(c.botId) === 0));
 			},

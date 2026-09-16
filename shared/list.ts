@@ -14,8 +14,8 @@ export interface ListOptions {
 	itemsKey?: string;
 	/**
 	 * Page by ID instead of by offset — `order: {id: ASC}`, `filter: {'>id': last}`,
-	 * `start: -1`. Bitrix24 then skips counting the total, which on a large portal is
-	 * the difference between 50 ms and 50 s per page. Only possible when the caller
+	 * `start: -1`. Bitrix24 then skips counting the total, which on a large portal makes
+	 * each page many times faster. Only possible when the caller
 	 * has not asked for its own sort order.
 	 */
 	idField?: string;

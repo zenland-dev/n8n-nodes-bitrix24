@@ -296,7 +296,7 @@ export const templateChecklistItemResource: Resource = {
 			name: 'Attach Drive Files',
 			action: 'Attach Drive files to a template checklist item',
 			description: 'Attach files that are already on Bitrix24 Drive to a template checklist item',
-			properties: [templateId, itemId, { displayName: 'Drive File IDs', name: 'fileIds', type: 'string', required: true, default: '', placeholder: '428, 345', description: 'Comma-separated IDs of Drive files' }],
+			properties: [templateId, itemId, { displayName: 'Drive File IDs', name: 'fileIds', type: 'string', required: true, default: '', placeholder: '101, 102', description: 'Comma-separated IDs of Drive files' }],
 			async execute(itemIndex) {
 				const params = { ...templateItemParams(this, itemIndex), filesIds: idList(this, this.getNodeParameter('fileIds', itemIndex), 'Drive File IDs', itemIndex) };
 				return checkListItem(await bitrix24Request.call(this, 'tasks.template.checklist.addAttachmentsFromDisk', params, { itemIndex }));
@@ -307,7 +307,7 @@ export const templateChecklistItemResource: Resource = {
 			name: 'Remove Attachments',
 			action: 'Remove attachments from a template checklist item',
 			description: 'Detach files from a template checklist item by attachment ID',
-			properties: [templateId, itemId, { displayName: 'Attachment IDs', name: 'attachmentIds', type: 'string', required: true, default: '', placeholder: '1113, 1115', description: 'Comma-separated attachment IDs, as Get returns them under attachments' }],
+			properties: [templateId, itemId, { displayName: 'Attachment IDs', name: 'attachmentIds', type: 'string', required: true, default: '', placeholder: '101, 102', description: 'Comma-separated attachment IDs, as Get returns them under attachments' }],
 			async execute(itemIndex) {
 				const params = { ...templateItemParams(this, itemIndex), attachmentsIds: idList(this, this.getNodeParameter('attachmentIds', itemIndex), 'Attachment IDs', itemIndex) };
 				return checkListItem(await bitrix24Request.call(this, 'tasks.template.checklist.removeAttachments', params, { itemIndex }));

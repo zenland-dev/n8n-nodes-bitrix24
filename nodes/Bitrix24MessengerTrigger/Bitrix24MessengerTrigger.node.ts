@@ -8,6 +8,7 @@ import type {
 import { NodeConnectionTypes } from 'n8n-workflow';
 
 import { normalizeWebhookToken } from '../../credentials/portalAddress';
+import { credentialSecrets, scrubItems } from '../../shared/secrets';
 import { bitrix24Request, WEBHOOK_CREDENTIAL } from '../../shared/transport';
 import { EVENT_PAGE, eventItem, MESSENGER_EVENTS, readEvents } from '../Bitrix24Messenger/shared/events';
 
@@ -142,6 +143,6 @@ export class Bitrix24MessengerTrigger implements INodeType {
 			.filter((item) => includeOwn || webhookUserId === 0 || actorOf(item) !== webhookUserId);
 
 		if (items.length === 0) return null;
-		return [items.map((json) => ({ json }))];
+		return [scrubItems(items.map((json) => ({ json })), await credentialSecrets(this, WEBHOOK_CREDENTIAL))];
 	}
 }

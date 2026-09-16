@@ -8,6 +8,7 @@ import type {
 } from 'n8n-workflow';
 import { NodeConnectionTypes } from 'n8n-workflow';
 
+import { credentialSecrets, scrubSecrets } from '../../shared/secrets';
 import { bitrix24Request, WEBHOOK_CREDENTIAL } from '../../shared/transport';
 import { EVENT_OPTIONS } from './events';
 import { expandFormBody, parseFormBody } from './formBody';
@@ -174,7 +175,9 @@ export class Bitrix24Trigger implements INodeType {
 			if (Number.isInteger(entityTypeId) && entityTypeId > 0 && Number.isInteger(id) && id > 0) {
 				try {
 					const body = await bitrix24Request.call(this, 'crm.item.get', { entityTypeId, id });
-					item.record = ((body.result as IDataObject)?.item ?? body.result) as IDataObject;
+					// File fields carry urlMachine, a download link with the webhook code in it.
+					const record = ((body.result as IDataObject)?.item ?? body.result) as IDataObject;
+					item.record = scrubSecrets(record, await credentialSecrets(this, WEBHOOK_CREDENTIAL));
 				} catch (error) {
 					// The event itself is real and should still start the workflow.
 					item.recordError = error instanceof Error ? error.message : String(error);

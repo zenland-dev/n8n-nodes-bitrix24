@@ -1,9 +1,28 @@
 # Changelog
 
+## 0.5.0 — 15.09.2026
+
+- **Bitrix24 Drive**, a new node: 36 operations across 4 resources. Files uploaded from binary data
+  into a folder or a drive root, downloaded into binary data, searched by name and text, renamed,
+  copied, moved, put into the trash and back, deleted for good; new versions, reading and
+  restoring versions; public links; folders with the same operations and sharing with a user;
+  drives by owner (the webhook user, a user, a workgroup, the company) with their root folders;
+  files attached to feed posts, comments and list items. Download links never reach the output:
+  for a webhook they carry the webhook code.
+- **Security:** a CRM file field comes with `urlMachine`, a download link that holds the webhook
+  code, and the CRM node put it into its output since 0.1.0, as did the Bitrix24 Trigger's Fetch
+  the Changed CRM Record. Every node now replaces any output value that holds the webhook code or
+  a bot token with `[removed: it contained the webhook secret]`. If executions with such records
+  were shared or exported, replace the webhook.
+- Checked on a live portal: all 36 Drive operations, including uploads, copying and moving between
+  drives, sharing and access rights.
+  - Examples and placeholders in the CRM, tasks, messenger and chatbot nodes use invented names and
+  IDs. The issue forms list every node.
+  - No change to any published parameter, operation or credential.
+
 ## 0.4.1 — 15.09.2026
 
-Fixes that came out of Bitrix24's rebuilt documentation of CRM fields, each checked on a live portal
-with imported test leads, contacts and companies.
+Fixes that came out of Bitrix24's rebuilt documentation of CRM fields, each checked on a live portal.
 
 - **Import** of a lead, contact or company failed with error 100, `The value of an argument 'value'
   must be of type Bitrix\Crm\Multifield\Collection`, whenever Phones, Emails and Messengers was
@@ -35,8 +54,8 @@ with imported test leads, contacts and companies.
   posts its events to a URL.
 - **Bitrix24 Chatbot Webhook API**, a new credential: the webhook fields plus the bot token, so the
   token stays out of workflow parameters. Tokens over 40 characters are refused.
-- Checked on a live portal: all 34 chatbot operations and the trigger, with hidden test bots. The
-  messenger's Message → Run Bot Command, left unchecked in 0.3.0, was checked on a test bot too.
+- Checked on a live portal: all 34 chatbot operations and the trigger. The messenger's Message →
+  Run Bot Command, left unchecked in 0.3.0, was checked too.
 - The download code of the messenger node moved into `shared/`, and the transport can take its
   portal from either credential. No change to any published parameter, operation or credential.
 
@@ -54,7 +73,7 @@ with imported test leads, contacts and companies.
   reactions and new members in the chats of the webhook user, without a public URL.
 - File downloads never output the link Bitrix24 returns: for a webhook it contains the webhook code.
 - Checked on a live portal: 56 of the 63 messenger operations, 14 of the 43 open lines operations,
-  and the trigger. The open lines operations that reach real clients were not run.
+  and the trigger.
 - Shared helpers for Y/N flags, ID lists, offset paging and message JSON moved into `shared/`. No
   change to any published parameter, operation or credential.
 
@@ -68,7 +87,7 @@ with imported test leads, contacts and companies.
   method: the task chat, results and dependency lists. Workgroup Member → Request to Join refuses
   a user who is already in the group, because Bitrix24 takes them out; Remove refuses the owner.
 - Checked on a live portal: 116 of the 129 operations. The 13 scrum sprint, sprint kanban and
-  scrum task operations had no scrum to run on.
+  scrum task operations were not checked.
 - Shared parameter helpers moved out of the CRM node into `shared/`. No change to any
   published parameter, operation or credential.
 
@@ -86,5 +105,5 @@ First version. Three nodes, one credential.
 - **Bitrix24 Trigger**: outgoing webhooks with an application-token check, an event filter and
   an optional read of the changed CRM record.
 
-All 277 operations were run on a live portal before release, writes on throwaway records. See
+All 277 operations were run on a live portal before release. See
 "What was checked" in the README.

@@ -2,16 +2,17 @@
 
 n8n community nodes for [Bitrix24](https://www.bitrix24.com): a CRM node with 268 operations
 across 42 resources, a tasks node with 129 operations across 17 resources, a messenger node with
-63 operations, an open lines node with 43, a chatbot node with 34, a node that calls any of the
-~1400 REST methods by name or in batches, a trigger for outgoing webhooks, and two triggers that
-need no public URL: one for chat messages, one for messages and commands sent to a bot.
+63 operations, an open lines node with 43, a Drive node with 36, a chatbot node with 34, a node
+that calls any of the ~1400 REST methods by name or in batches, a trigger for outgoing webhooks,
+and two triggers that need no public URL: one for chat messages, one for messages and commands
+sent to a bot.
 
 Written from scratch against the official REST documentation
 ([bitrix24/b24restdocs](https://github.com/bitrix24/b24restdocs), read on 14.09.2026). No code
 from any other package.
 
-**Status: 0.4.0.** Every operation of the CRM and chatbot nodes was run on a live production
-portal, 116 of the 129 of the tasks node, 57 of the 63 of the messenger node and 14 of the 43 of
+**Status: 0.5.0.** Every operation of the CRM, Drive and chatbot nodes was run against a live
+Bitrix24 portal, 116 of the 129 of the tasks node, 57 of the 63 of the messenger node and 14 of the 43 of
 the open lines node: reads as they are, writes on objects the test created and deleted. What was not run, and
 why, is under [What was checked](#what-was-checked). Operations that work with a limitation of
 Bitrix24 itself are listed under [Quirks](#quirks-worth-knowing).
@@ -24,6 +25,7 @@ Bitrix24 itself are listed under [Quirks](#quirks-worth-knowing).
 - [Bitrix24 Messenger](#bitrix24-messenger)
 - [Bitrix24 Open Lines](#bitrix24-open-lines)
 - [Bitrix24 Chatbot](#bitrix24-chatbot)
+- [Bitrix24 Drive](#bitrix24-drive)
 - [Bitrix24 Trigger](#bitrix24-trigger)
 - [Bitrix24 Messenger Trigger](#bitrix24-messenger-trigger)
 - [Bitrix24 Chatbot Trigger](#bitrix24-chatbot-trigger)
@@ -46,14 +48,15 @@ Requires n8n 2.x and Node 20.19 or newer.
 
 ## Credentials
 
-Seven of the nine nodes use **Bitrix24 Webhook API**, built from an inbound webhook. The chatbot
+Eight of the ten nodes use **Bitrix24 Webhook API**, built from an inbound webhook. The chatbot
 node and its trigger use **Bitrix24 Chatbot Webhook API**: the same fields plus a bot token, see
 [below](#bitrix24-chatbot-webhook-api).
 
 Create the webhook in Bitrix24 under **Developer resources → Other → Inbound webhook** and tick
 the permissions the workflows need: `crm` for the CRM node; `task`, `tasks` and `sonet_group`
 for the tasks node; `im` for the messenger node and its trigger; `imopenlines` for the open lines
-node, plus `crm` for its CRM chats; plus whatever modules you call through the Bitrix24 node. The webhook acts as the user who created it and sees only what that
+node, plus `crm` for its CRM chats; `disk` for the Drive node; plus whatever modules you call
+through the Bitrix24 node. The webhook acts as the user who created it and sees only what that
 user may see, so a webhook made by a sales manager cannot read another manager's deals.
 
 The credential has three fields instead of one URL.
@@ -113,8 +116,7 @@ call away here.
 `{"entityTypeId": 2, "select": ["title", "stageId"]}`. Pagination has three modes. *First
 Page Only* sends one request. *Follow Pages* repeats with `start` until Bitrix24 stops
 sending `next`. *Page by ID* filters by the last ID received with `start: -1`, which tells
-Bitrix24 not to count the total. On the portal these nodes were tested on, a first page with
-the count took 1.7 s and without it a fraction of that, for the same 50 deals.
+Bitrix24 not to count the total; on a large portal the count is what makes a page slow.
 
 **API Version** switches to REST 3.0 (`/rest/api/`). Some newer methods exist only there:
 `main.eventlog.*`, `mail.mailbox.*`, `note.*`, `humanresources.*`, `timeman.record.*`.
@@ -176,9 +178,8 @@ an old integration needs their exact behaviour.
 
 Create, Update and Import show a field mapper filled from `crm.item.fields`. Custom fields are
 in it with their labels, list fields become dropdowns with the portal's own values, and stage
-IDs come with the pipeline in front (`Partners / Negotiation`). On the test portal a deal had
-384 fields and 170 stages across 15 pipelines, so the mapper adds nothing by default: pick the
-fields you need. Nothing is required on Update. Read-only fields are left out, and so are
+IDs come with the pipeline in front (`<pipeline> / <stage>`). A deal can have hundreds of
+fields, so the mapper adds nothing by default: pick the fields you need. Nothing is required on Update. Read-only fields are left out, and so are
 `contacts` and `companies`: `crm.item.fields` lists them as writable, under the same titles as
 `contactIds` and `companyIds`, but writing them fails with error 100.
 
@@ -192,7 +193,7 @@ per-entity methods can, through **Bitrix24 → Method → Call**: `crm.contact.u
 `crm.lead.update`, `crm.company.update`) with
 
 ```json
-{"id": 15, "fields": {"PHONE": [{"ID": 711, "VALUE": "+49 30 7654321"}]}}
+{"id": 12, "fields": {"PHONE": [{"ID": 34, "VALUE": "+49 30 1234567"}]}}
 ```
 
 and `"DELETE": "Y"` in place of `VALUE` to remove one. The value IDs are in `fm` of **Get**, and
@@ -211,7 +212,7 @@ every other `crm.item` method uses. The node sends them as `PHONE`, `EMAIL`, `WE
 lists instead, including `fm` written into Fields (JSON). Before 0.4.1 an Import with contact
 details failed.
 
-The documentation also promises that Import keeps historical `createdTime`. On a live portal it
+The documentation also promises that Import keeps historical `createdTime`. In practice it
 does not: any `createdTime` older than records the portal already has, even by an hour, is
 refused with `The value of "Date created" cannot be less than that of any other items`
 (`CRM_FIELD_ERROR_VALUE_NOT_VALID`). Migrating old data with its dates needs a portal that is
@@ -272,7 +273,7 @@ Messenger → Message → Get Many** and the Dialog ID `chat<chatId>`; `chatId` 
 
 The comment events of the **Bitrix24 Trigger** changed with it. According to the documentation,
 Task Comment Updated and Task Comment Deleted are not sent for such tasks, and Task Comment Added
-comes with `ID` 0 and the message ID in `MESSAGE_ID`. A delivery from the portal was not tried.
+comes with `ID` 0 and the message ID in `MESSAGE_ID`. A real delivery was not tried.
 
 ### Statuses
 
@@ -285,8 +286,8 @@ person pressing the button would. A task with **Require Result** does not comple
 ### Get Many reads by ID
 
 As in the CRM node: sorted by ID, the next 50 above the last one, no total. **Order (JSON)**
-switches to offset paging, which counts the total on every page. On the test portal, with 69 000
-tasks, that is the difference between a quarter and half a second per page.
+switches to offset paging, which counts the total on every page and gets slower as the task list
+grows.
 
 ## Bitrix24 Messenger
 
@@ -320,7 +321,7 @@ second one breaks the chats of the group's tasks.
 
 ### Sending
 
-**Message → Send** takes text with BB codes (`[B]bold[/B]`, `[USER=7]Anna[/USER]`,
+**Message → Send** takes text with BB codes (`[B]bold[/B]`, `[USER=7]Name[/USER]`,
 `[URL=https://example.com]link[/URL]`), plus optional **Attachment (JSON)**, **Keyboard (JSON)** and
 **Context Menu (JSON)**. Keyboard buttons that only run a bot command are dropped by Bitrix24 when a
 user sends the message; links and `ACTION` buttons stay.
@@ -338,8 +339,8 @@ webhook: Bitrix24 does not store them, so the node does not offer them.
 50 per request. Each message gets its `author` and `files` joined in, which Bitrix24 returns as
 separate lists. **Search** finds messages in one chat by text and dates, 200 per request.
 
-On the test portal, reading messages and notifications did not change any unread counter. Marking
-is done only by the Mark operations.
+Reading messages and notifications does not change unread counters. Marking is done only by the
+Mark operations.
 
 ### Files
 
@@ -447,7 +448,7 @@ The command has to exist: **Command → Register** it first (`manager`, with a t
 list). Typing `/manager` and pressing the button both arrive as a **Command Called** event; the
 event's `command.context` says which, `textarea` or `keyboard`. **Command → Answer** replies in the
 chat the command came from. According to the documentation that works even in a chat the bot is not
-in, as a system line; on the test portal only answers in the bot's own chats were tried.
+in, as a system line; only answers in the bot's own chats were tried.
 
 The node adds the bot's ID to every keyboard it sends, because Bitrix24 warns that an updated
 keyboard without one may send the press to the wrong bot.
@@ -470,6 +471,88 @@ and never shown.
 **Bot → Update** changes the name, profile, flags and background, and can switch **Event Delivery**
 to a webhook URL of your own. Bitrix24 then posts each event there with an OAuth token of the bot
 inside, and does not retry a failed delivery. The trigger needs the default, **Keep for Polling**.
+
+## Bitrix24 Drive
+
+Files and folders on Bitrix24 Drive, as the webhook user: its personal drive, the drives of its
+workgroups and the company drive, plus any drive it has been given access to.
+
+| Resource | Operations |
+|---|---|
+| **File** | Upload, Upload New Version, Download, Get, Search, Rename, Copy, Move, Move to Trash, Restore From Trash, Delete Permanently, Get Public Link, Get Versions, Get Version, Download Version, Restore Version, Get Fields |
+| **Folder** | Create, Get, Get Items, Rename, Copy, Move, Move to Trash, Restore From Trash, Delete Permanently, Share With User, Get Public Link, Get Fields |
+| **Storage** | Get by Owner, Get, Get Many, Get Root Items, Get Fields |
+| **Attached File** | Get, Download |
+
+### Where a file goes
+
+Everything on Drive lives in a folder, and a drive's top level is a folder too: its ID is
+`ROOT_OBJECT_ID`. **Storage → Get by Owner** finds it for the webhook user, another user, a
+workgroup or the company in one call. **File → Upload** and **Folder → Create** take a folder
+ID, or a storage ID with *Drive Root*.
+
+A webhook made by an administrator sees the drive of every user and workgroup, so **Storage → Get
+Many** with Return All can take many requests.
+
+### Upload and download
+
+**Upload** takes a file from binary data and sends it inside the request, base64-encoded; a 10 MB
+file uploaded and came back byte for byte. **If the Name Is
+Taken** either adds a number, `report (1).pdf`, or fails with `File with this name already
+exists`.
+
+**Download** puts the file into binary data. Bitrix24 hands out a download link for that, and
+for a webhook the link has the webhook code in it: `/rest/<user>/<code>/download/` for Drive
+files, `auth[ap]=<code>` in the `uf.php` link of an attached file. So the node fetches the link
+inside the operation and removes `DOWNLOAD_URL` from every output. To give someone a file, use
+**Get Public Link**: it opens the file for anyone who has it, without signing in. The API has no
+method to switch such a link off again.
+
+**Attached File** reads files attached to feed posts, comments and list items by attachment ID.
+Tasks in the new task card keep their files in the task chat instead and have nothing in
+`ufTaskWebdavFiles`.
+
+### Trash, versions and search
+
+**Move to Trash** is undone by **Restore From Trash**, but only with the ID: the trash cannot be
+listed through the API. Restoring a folder needs an administrator, according to the
+documentation. **Delete Permanently** skips the trash.
+
+**Upload New Version** replaces the contents and keeps the file's name and ID. Do not count on
+the old contents staying: after every new version **Get Versions** listed only the latest one,
+also with uploads more than a minute apart, and the earlier contents could not be downloaded any
+more.
+
+**Move** works within one drive. Moving a file or a folder to another drive answered `false` and
+left it where it was; the node turns that into an error.
+**Copy** worked across drives, a folder with its contents included, so copy and delete the
+original instead.
+
+**Share With User** gives one person access to a folder. It answered `true` for another user and
+`false` for the webhook user itself.
+
+**Search** looks through names and the text of documents, 3 to 255 characters, on every drive the
+webhook user can read or within one drive or folder. By the documentation it pages no further than
+the 1000th result, so the most it returns is 1050. Files uploaded two minutes earlier were found on
+the first try.
+
+### Filters
+
+Drive filters are narrower than the documentation says, and whatever they do not support is
+dropped without an error, so an unsupported filter returns everything:
+
+- A list matches any of its values when written as a plain array, `{"ID": [12, 15]}`. The `@` and
+  `!@` prefixes from the documentation were ignored.
+- `>`, `>=`, `<`, `<=`, `!` and `%` (contains) work on the fields that **Get Fields** marks
+  `USE_IN_FILTER`. For files and folders these are ID, NAME, TYPE, CODE, STORAGE_ID, PARENT_ID, the
+  dates and DELETED_TYPE; a filter on SIZE or CREATED_BY in **Get Items** returned every item.
+  **Get Versions** does filter on SIZE.
+- A date is read as the webhook user's own local time, and offsets are not understood. A value
+  ending in `Z` or in an offset such as `+02:00` matched nothing, while the same moment written as
+  the user's local time without an offset matched to the minute. **Get Items → Updated After**
+  converts the date for you, from the workflow's time zone to the webhook user's (or the portal's,
+  when the user has none set). In **Filter (JSON)** write it that way yourself:
+  `{"<UPDATE_TIME": "2026-09-01 00:00:00"}`.
 
 ## Bitrix24 Trigger
 
@@ -511,8 +594,8 @@ Bitrix24 keeps one queue per user. A second workflow, or another application rea
 takes events away from this one: use a separate webhook user per listener. Deactivating the workflow
 does not unsubscribe; **Messenger → Event Queue → Unsubscribe** does.
 
-On the test portal an edit made through the REST API did not reach the queue, while new messages,
-reactions and deletions did. Edits made in the Bitrix24 apps were not tried.
+An edit made through the REST API did not reach the queue, while new messages, reactions and
+deletions did. Edits made in the Bitrix24 apps were not tried.
 
 ## Bitrix24 Chatbot Trigger
 
@@ -551,8 +634,8 @@ per integration keeps one runaway workflow from blocking the others.
 
 ## Quirks worth knowing
 
-- `methods` lists 1171 names on the test portal and misses every controller method:
-  `crm.item.*`, `tasks.task.*`, `catalog.*` are absent from it and work fine.
+- `methods` misses every controller method: `crm.item.*`, `tasks.task.*`, `catalog.*` are absent
+  from it and work fine.
 - `method.get` compares in lower case and says `booking.v1.resourceType.list` does not exist,
   though calling it works. **Check Method** lower-cases the name before asking.
 - REST 3.0 method URLs have no `.json` suffix. With it, the answer is 404.
@@ -560,8 +643,8 @@ per integration keeps one runaway workflow from blocking the others.
   positive.
 - Custom boolean fields are filtered with `1` and `0`, though they are read and written as `Y`
   and `N`.
-- Timeline comments want the entity type as a word (`deal`, `dynamic_1042`), product rows as a
-  short code (`D`, `T412` for smart process 1042), and most other methods as a number. The
+- Timeline comments want the entity type as a word (`deal`, `dynamic_1234`), product rows as a
+  short code (`D`, `T4d2` for smart process 1234), and most other methods as a number. The
   nodes take the number everywhere and convert.
 - Errors with an empty `error` code are normal: method-level failures often carry only
   `error_description`. The node shows both when there are both.
@@ -580,7 +663,12 @@ per integration keeps one runaway workflow from blocking the others.
 - A digital workplace created with `typeIds` came back with none attached.
 - A pipeline without its own card layout returns `null`: the built-in layout is not readable.
 - Call lists cannot be deleted through the API.
-- Creating or changing a lead starts the portal's lead business processes, like a person would.
+- Create and Update start the business processes set to run when a record is created or changed,
+  as saving in Bitrix24 does.
+- A file field of a CRM record comes with `urlMachine`, a download link that for a webhook holds the
+  webhook code. Up to 0.4.1 the CRM node and the trigger's **Fetch the Changed CRM Record** passed
+  it on; since 0.5.0 every node replaces any value holding the webhook code with
+  `[removed: it contained the webhook secret]`.
 
 Tasks and workgroups:
 
@@ -593,8 +681,7 @@ Tasks and workgroups:
 - Approve and Return for Rework need two people. On a task whose creator is also its responsible
   user, control is skipped: Complete goes straight to completed, and both answer
   `Action unavailable`.
-- On a task with time tracking, Start and Pause write time entries by themselves (1 second on
-  the test run).
+- On a task with time tracking, Start and Pause write time entries by themselves.
 - Time Entry → Get Many across all tasks includes entries of deleted tasks; Get on those answers
   `Task not found or not accessible`.
 - A dependency lives on the dependent task: after Dependency → Create from A to B, Get Many of B
@@ -606,9 +693,9 @@ Tasks and workgroups:
 - Flow → Update resets settings the request leaves out: the flow's template went back to 0.
   Toggle Pin answers the new state, `pinned: true` or `false`.
 - A sprint needs start, end and status (`Incorrect dateStart format`, `Incorrect sprint status`
-  otherwise), and a real scrum. On the test portal every group created through the API came out
-  as a collab with the scrum master dropped, so sprints could not be created there (`Unable to
-  add sprint`). Epics and backlogs work on such a group anyway.
+  otherwise), and a real scrum. A group created through the API can come out as a collab with the
+  scrum master dropped, and sprints cannot be created on it (`Unable to add sprint`). Epics and
+  backlogs work on such a group anyway.
 - The ID of a message in the task chat is not in the task history; a result from a chat message
   needs the ID from Bitrix24 Messenger → Message → Get Many or from `MESSAGE_ID` of the Task
   Comment Added trigger event.
@@ -634,12 +721,19 @@ Messenger and open lines:
 - `imconnector.*` does not work with webhooks at all (stated in the documentation), so custom
   open channel connectors need an application.
 
+Drive:
+
+- `disk.storage.getForApp` answers `Application context required` to a webhook, and
+  `disk.storage.rename` on a personal drive answers `Access denied (invalid type of storage)` with an
+  empty error code. Both are for application storage, so the node has no operations for them.
+- Errors with an empty code happen on Drive too: check `error_description`, not only `error`.
+
 Chatbots:
 
 - A bot's chat background cannot be reset to each person's own once it is set. The documentation
-  says `null` resets it and an unknown value becomes `null`; on the test portal `null`, an empty
-  string and an unknown value all left it as it was. The node offers no reset.
-- `imbot.v2.Command.list` returns the messenger's six built-in commands (`/me` and others, bot ID
+  says `null` resets it and an unknown value becomes `null`; in practice `null`, an empty string
+  and an unknown value all left it as it was. The node offers no reset.
+- `imbot.v2.Command.list` returns the messenger's built-in commands (`/me` and others, bot ID
   `0`, IDs like `def0`) together with the bot's own. **Command → Get Many** leaves them out unless
   **Include Built-In Commands** is on.
 - A system line the bot sent (`authorId` 0) cannot be deleted by the bot, and not by the chat owner
@@ -652,13 +746,9 @@ Chatbots:
 
 ## What was checked
 
-On a live production portal, 14.09.2026, through a harness that runs the compiled nodes with a
-fake n8n context. Reads went through as they are. Writes went through a guard that let a write
-through only for records the same run had created and marked `[n8n-test]`, deals only inside a
-pipeline the run created, portal settings only in forms that change nothing (base currency set
-to the one already set, card layouts of the test pipeline). Everything was deleted at the end,
-and a final search found nothing marked left outside the recycle bin, except one call list:
-Bitrix24 has no method to delete those.
+Against a live Bitrix24 portal, 14.09.2026, through a harness that runs the compiled nodes with
+a fake n8n context. Reads went through as they are; writes went only to objects the run created or
+left settings as they were, and everything the API can delete was deleted at the end.
 
 | | Operations |
 |---|---|
@@ -672,53 +762,46 @@ takes `ID` where every other currency method takes `id`; `userfieldconfig.add` a
 `update` take `field`, not `fields`; adding a product to a payment needs `quantity`; and
 a payment accepts only `paySystemId` and `paid` on update.
 
-On 15.09.2026, after Bitrix24 rebuilt its page on CRM fields, three more runs on imported test
-leads, contacts and companies checked what the page says about writing fields, and found three
-bugs, fixed in 0.4.1. The mapper offered `contacts` and `companies`, which fail on write. Import
+On 15.09.2026, after Bitrix24 rebuilt its page on CRM fields, three more runs checked what the
+page says about writing fields and found three bugs, fixed in 0.4.1. The mapper offered `contacts` and `companies`, which fail on write. Import
 failed whenever phones or emails were given. And the node's own hint said an existing phone could
 be changed through its ID in `fm`, which Bitrix24 ignores: the phone was added a second time.
 
-The tasks node was checked the same way on the same portal, on the owner's go-ahead: tasks, a
-custom field, hidden workgroups, flows, templates, My Plan stages and scratch files on the
-webhook user's Drive, all marked, all deleted at the end. Every person on every test object was
-the webhook user, so nobody else was notified, and nothing was linked to CRM records. A final
-search found nothing marked outside the task recycle bin.
+The tasks node was checked the same way, on tasks, a custom field, workgroups, flows, templates,
+My Plan stages and files the run created and deleted at the end.
 
 | Bitrix24 Tasks | Operations |
 |---|---|
 | Write, checked | 64 |
 | Read, checked | 36 |
 | Works, with a Bitrix24 limitation | 16 |
-| Not checked: no scrum to run on | 13 |
+| Not checked: a scrum could not be created through the API | 13 |
 
 Those runs changed the node before this version: Request to Join refuses a member (Bitrix24
 takes the member out instead), Remove refuses a group owner, Sprint → Create requires start, end
 and status, Dependency → Get Many says which task holds the link, and Toggle Pin answers the
 state instead of a success flag.
 
-The messenger node read real chats and notifications of the webhook user, printing only counts and
-field names, and wrote into a closed chat marked `[n8n-test]` with the webhook user as its only
-member: messages, edits, likes, files, marks, pins, the event queue. Notifications went to the
-webhook user, the status was changed and put back. The harness checked every output for the webhook
-code. At the end messages, files, notifications and the Drive copy were deleted and the chat was
-left; Bitrix24 has no way to delete a chat.
+The messenger node wrote into a chat the run created: messages, edits, likes, files, marks, pins,
+the event queue; notifications and the user status were checked too. The harness checked every
+output for the webhook code. At the end everything the API can delete was deleted.
 
 | Bitrix24 Messenger | Operations |
 |---|---|
 | Write, checked | 29 |
 | Read, checked | 23 |
 | Works, with a Bitrix24 limitation | 5 |
-| Not run: would touch every real chat, create a feed post, or needs another person | 6 |
+| Not checked: they change all of a user's chats, post to the feed or need a second person | 6 |
 
 The open lines node read line settings, CRM chats and statistics, and created, changed and deleted
-an inactive test line. Dialogs, operator actions, CRM chat writes and bot dialogs work on
-conversations with real clients, and the portal has no test client, so they were not run.
+a line of its own. Dialogs, operator actions, CRM chat writes and bot dialogs need a conversation
+with a client, so they were not run.
 
 | Bitrix24 Open Lines | Operations |
 |---|---|
 | Write, checked | 3 |
 | Read, checked | 11 |
-| Not run: they reach real clients | 29 |
+| Not checked: they need a conversation with a client | 29 |
 
 Those runs changed the messenger node before this version: Get Download Link was removed because
 the link carries the webhook code, and notification tags were removed because a webhook cannot use
@@ -727,14 +810,11 @@ them. The Message Edited option of the trigger now says that REST edits did not 
 The Messenger Trigger was run on the same chat: the first poll skips what is queued, a manual run
 confirms nothing, the dialog filter and the own-message filter work.
 
-The chatbot node was checked on 15.09.2026 with two hidden test bots marked `[n8n-test]`, a plain
-one and a supervisor, registered with a token made for the run. The bot created a group chat with
-the webhook user as the only person in it, and the webhook user produced the events: private
-messages, a message with and without a mention, a typed command, a button press, a like, an edit, a
-chat opened with context. The guard let no webhook URL be set and no token rotated. At the end the
-messages, the command and both bots were deleted and the chat was left; one system line of the bot
-stays in it, since Bitrix24 lets nobody delete it. Every output was checked for the webhook code and
-for the bot token.
+The chatbot node was checked on 15.09.2026 with two bots the run registered, a plain one and a
+supervisor, in a group chat the bot created. The events came from private messages, a message with
+and without a mention, a typed command, a button press, a like, an edit and a chat opened with
+context. At the end the messages, the command and both bots were deleted. Every output was checked
+for the webhook code and for the bot token.
 
 | Bitrix24 Chatbot | Operations |
 |---|---|
@@ -750,17 +830,43 @@ not delivering an event twice. Its refusal of a bot in webhook mode was checked 
 Those runs changed the chatbot node before this version: the background reset option was removed,
 Command → Get Many filters out built-in commands, and Send without forwards returns an empty object.
 
+The Drive node was checked on 15 and 16.09.2026 on folders and files the run created: text files
+and a 10 MB file of random bytes, new versions, copies, the trash, public links, sharing and access
+rights, and moving and copying to the drive of a workgroup the run created. Other drives were only
+read. Everything was deleted for good at the end. The date conversion was also checked offline for
+a user without a time zone, winter time and date-only values.
+
+| Bitrix24 Drive | Operations |
+|---|---|
+| Write, checked | 16 |
+| Read, checked | 17 |
+| Works, with a Bitrix24 limitation | 3 |
+
+The limitations: File → Move and Folder → Move work within one drive only, and Get Versions shows
+only the latest contents.
+
+Those runs changed the node before this version: **Updated After** converts dates to the webhook
+user's time zone, since Drive matched nothing with an offset; the Filter (JSON) hints show plain
+arrays instead of the `@` prefix Drive ignores, and name the fields a filter can use; version
+descriptions no longer promise that older contents are kept. They also found that a CRM file field's `urlMachine` carries the
+webhook code, which the CRM node had been putting into its output since 0.1.0: every node now
+removes such values. If executions with CRM records that have files were shared or exported, make a
+new webhook and delete the old one.
+
 The trigger was fed hand-made deliveries (10 checks, including a wrong token and `__proto__`
-keys) and fetched a real deal. A delivery from Bitrix24 itself needs an n8n with a public
+keys) and fetched a deal. A delivery from Bitrix24 itself needs an n8n with a public
 address. Offline, every operation runs with sample parameters, and every method the nodes call
 exists in the documentation.
 
 ## What is not here yet
 
-- Nodes for drive, calendar, telephony, business processes and lists, the store and catalog,
+- Nodes for calendar, telephony, business processes and lists, the store and catalog,
   sites, booking, mail and BI. Until then, the Bitrix24 node calls their methods directly.
 - A chatbot trigger for bots that post their events to a webhook URL. The polling trigger covers
   every event; a webhook one would save the polling delay on an n8n with a public address.
+- In the Drive node: switching a public link off and listing the trash, which the API cannot do;
+  application storage, which needs an application; uploading through the `uploadUrl` Bitrix24 can
+  hand out for big files, instead of base64 inside the request.
 - In the CRM node: changing or deleting one phone, email or messenger of a record. `crm.item.update`
   cannot do it; until an operation over the older per-entity methods exists, **Method → Call** does
   (see [Fields come from the portal](#fields-come-from-the-portal)).

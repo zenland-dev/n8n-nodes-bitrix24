@@ -42,7 +42,7 @@ const LINK_TYPES = [
 ];
 
 const LINK_ID_DESCRIPTION =
-	'CRM: DEAL|1663, LEAD|13, CONTACT|25, COMPANY|7 or DYNAMIC_1042|5 for a smart process item. Task and workgroup: the ID. Open channel: connector|line|chat|user, e.g. telegrambot|2|209607941|744.';
+	'CRM: DEAL|1663, LEAD|13, CONTACT|25, COMPANY|7 or DYNAMIC_1234|5 for a smart process item. Task and workgroup: the ID. Open channel: connector|line|chat|user, e.g. telegrambot|2|209607941|744.';
 
 async function avatarOf(ctx: IExecuteFunctions, itemIndex: number, property: string): Promise<string> {
 	const { content } = await binaryAsBase64(ctx, itemIndex, property);
@@ -60,7 +60,7 @@ export const chatResource: Resource = {
 			action: 'Create a group chat',
 			description: 'Create a group chat with the given members; the webhook user becomes its owner',
 			properties: [
-				{ displayName: 'Title', name: 'title', type: 'string', default: '', description: 'Leave empty for a generated title such as "Chat with Anna, Oleg"' },
+				{ displayName: 'Title', name: 'title', type: 'string', default: '', description: 'Leave empty for a generated title such as "Chat with Alex, Sam"' },
 				{ ...userIdsProperty, required: false, description: 'Comma-separated IDs of the members besides the webhook user' },
 				{
 					displayName: 'Additional Fields',

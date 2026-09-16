@@ -182,7 +182,7 @@ function epicOptions(forUpdate: boolean): INodeProperties[] {
 	const options: INodeProperties[] = [
 		{ displayName: 'Color', name: 'color', type: 'color', default: '#69DAFC' },
 		{ displayName: 'Description', name: 'description', type: 'string', typeOptions: { rows: 3 }, default: '' },
-		{ displayName: 'Drive File IDs', name: 'files', type: 'string', default: '', placeholder: '428, 345', description: 'Comma-separated Drive files to attach to the epic' },
+		{ displayName: 'Drive File IDs', name: 'files', type: 'string', default: '', placeholder: '101, 102', description: 'Comma-separated Drive files to attach to the epic' },
 	];
 	if (forUpdate) options.push({ displayName: 'Name', name: 'name', type: 'string', default: '' });
 	return byDisplayName(options);

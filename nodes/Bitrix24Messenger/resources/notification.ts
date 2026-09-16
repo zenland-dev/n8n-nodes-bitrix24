@@ -179,7 +179,7 @@ export const notificationResource: Resource = {
 			action: 'Mark notifications as read or unread',
 			description: 'Mark notifications of the webhook user as read or unread',
 			properties: [
-				{ displayName: 'Notification IDs', name: 'notificationIds', type: 'string', required: true, default: '', placeholder: '1500, 1501', description: 'Comma-separated notification IDs' },
+				{ displayName: 'Notification IDs', name: 'notificationIds', type: 'string', required: true, default: '', placeholder: '101, 102', description: 'Comma-separated notification IDs' },
 				{
 					displayName: 'Mark As',
 					name: 'markAs',
