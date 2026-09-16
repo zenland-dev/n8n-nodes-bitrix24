@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.6.0 — 16.09.2026
+
+- **Bitrix24 Calendar**, a new node: 21 operations across 4 resources, one per documented
+  `calendar.*` method. Events in the calendar of a user, a workgroup or the company — created with
+  participants, reminders and a repeat rule, read one by one, over a period or as the days ahead,
+  updated in whole or one occurrence of a series at a time, and deleted. Participation answered for
+  the webhook user, and the availability of a list of people over a period, for finding a free
+  slot. The calendars themselves: added, renamed, recoloured, exported as an iCal link, deleted.
+  Booking resources and their bookings, by resource or by the IDs a CRM resource booking field
+  holds. The calendar settings of the portal and of the webhook user.
+- Event times are sent as plain local time next to the zone they belong to, converted from the
+  workflow's time zone or from **Time Zone** in the additional fields. An all-day event sends dates
+  alone.
+- A weekly recurrence always names its weekdays, and with none picked it repeats on the weekday the
+  event starts on. Bitrix24 left to itself stores `{MO: MO}` for an event starting on any other day,
+  and such an event then disappears from every list — created, readable by ID, never returned by
+  `calendar.event.get`. Found on a live portal and fixed before this version.
+- **Event → Get** of an event that was deleted now says `Bitrix24 has no event <ID>`. The method
+  answers an empty object rather than an error.
+- Checked on a live portal, all 21 operations, in a calendar created for the webhook user and
+  deleted afterwards; no event had participants, so nobody was invited. Three operations work with
+  a limitation of Bitrix24: both meeting-status operations need an event that is a meeting, and
+  Get Availability counts only events that take up time.
+- No change to any published parameter, operation or credential of the other nodes.
+
 ## 0.5.0 — 15.09.2026
 
 - **Bitrix24 Drive**, a new node: 36 operations across 4 resources. Files uploaded from binary data

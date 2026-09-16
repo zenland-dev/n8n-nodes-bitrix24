@@ -2,17 +2,17 @@
 
 n8n community nodes for [Bitrix24](https://www.bitrix24.com): a CRM node with 268 operations
 across 42 resources, a tasks node with 129 operations across 17 resources, a messenger node with
-63 operations, an open lines node with 43, a Drive node with 36, a chatbot node with 34, a node
-that calls any of the ~1400 REST methods by name or in batches, a trigger for outgoing webhooks,
-and two triggers that need no public URL: one for chat messages, one for messages and commands
-sent to a bot.
+63 operations, an open lines node with 43, a Drive node with 36, a chatbot node with 34, a calendar
+node with 21, a node that calls any of the ~1400 REST methods by name or in batches, a trigger for
+outgoing webhooks, and two triggers that need no public URL: one for chat messages, one for
+messages and commands sent to a bot.
 
 Written from scratch against the official REST documentation
 ([bitrix24/b24restdocs](https://github.com/bitrix24/b24restdocs), read on 14.09.2026). No code
 from any other package.
 
-**Status: 0.5.0.** Every operation of the CRM, Drive and chatbot nodes was run against a live
-Bitrix24 portal, 116 of the 129 of the tasks node, 57 of the 63 of the messenger node and 14 of the 43 of
+**Status: 0.6.0.** Every operation of the CRM, Drive, chatbot and calendar nodes was run against a
+live Bitrix24 portal, 116 of the 129 of the tasks node, 57 of the 63 of the messenger node and 14 of the 43 of
 the open lines node: reads as they are, writes on objects the test created and deleted. What was not run, and
 why, is under [What was checked](#what-was-checked). Operations that work with a limitation of
 Bitrix24 itself are listed under [Quirks](#quirks-worth-knowing).
@@ -26,6 +26,7 @@ Bitrix24 itself are listed under [Quirks](#quirks-worth-knowing).
 - [Bitrix24 Open Lines](#bitrix24-open-lines)
 - [Bitrix24 Chatbot](#bitrix24-chatbot)
 - [Bitrix24 Drive](#bitrix24-drive)
+- [Bitrix24 Calendar](#bitrix24-calendar)
 - [Bitrix24 Trigger](#bitrix24-trigger)
 - [Bitrix24 Messenger Trigger](#bitrix24-messenger-trigger)
 - [Bitrix24 Chatbot Trigger](#bitrix24-chatbot-trigger)
@@ -554,6 +555,120 @@ dropped without an error, so an unsupported filter returns everything:
   when the user has none set). In **Filter (JSON)** write it that way yourself:
   `{"<UPDATE_TIME": "2026-09-01 00:00:00"}`.
 
+## Bitrix24 Calendar
+
+Events in the calendars of employees, workgroups and the company, the calendars themselves, the
+resources a CRM booking field offers, and the settings behind them. The webhook needs the
+`calendar` permission.
+
+| Resource | Operations |
+|---|---|
+| **Event** | Create, Get, Get Many, Get Upcoming, Update, Delete, Get Availability, Get Meeting Status, Set Meeting Status |
+| **Calendar** | Create, Get Many, Update, Delete |
+| **Booking Resource** | Create, Get Many, Update, Delete, Get Bookings |
+| **Settings** | Get Portal Settings, Get User Settings, Update User Settings |
+
+### Whose calendar
+
+Every event belongs to an owner, and the owner is two parameters: **Calendar Type** and **Owner
+ID**. For a user calendar, Owner ID 0 means the user the webhook acts as, and the node fills in its
+ID. A group calendar has no default owner, so it needs the ID of the workgroup or project. The
+company calendar always has owner 0.
+
+One owner can keep several calendars — work, trips, a project. **Calendar** lists, adds, renames
+and deletes them, and in **Event → Create** the *Calendar* parameter either names one or leaves the
+choice to Bitrix24. A webhook made by an ordinary user can only add calendars to that user;
+an administrator can add them to anyone.
+
+The organizer of an event the node creates is always the webhook user. Bitrix24 has no way to hand
+an event over to someone else afterwards: to change the organizer, delete the event and create it
+again on behalf of that person. **Organizer User ID** in Update is for the opposite case — the
+webhook user editing a meeting somebody else runs, and it has to name the current organizer or the
+call is refused.
+
+### Time zones
+
+Bitrix24 takes either a full ISO-8601 string with an offset, and then ignores any time zone given
+next to it, or a plain date and time together with a zone name. The node sends the second form: your
+**Start** and **End** are converted to wall-clock time in the workflow's time zone, and that zone
+goes with them, so the event keeps the zone you meant rather than one the portal guesses. **Time
+Zone** in the additional fields overrides it — write it as `Europe/Riga`.
+
+**All Day** sends the dates alone, without a time and without a zone, which is what Bitrix24 calls
+`skip_time`. The dates of **Get Many**, **Get Availability** and **Get Bookings** are periods, so
+they go as plain days, in ISO form: Bitrix24 reads `2026-09-16` and `2026-09-16 10:00:00`, while a
+day written as `16/09/2026` is not understood and silently widens the period to years.
+
+A period is open at its end. **From** and **To** on the same day return nothing at all, and a
+one-day event is only found by a period that reaches past it — take the next day as **To**.
+
+Dates come back the way the portal writes them, `DD/MM/YYYY hh:mm:ss` or `MM/DD/YYYY hh:mm:ss am`
+depending on its language, so they are text and not ISO. To compare or sort, use `DATE_FROM_TS_UTC`
+and `DATE_TO_TS_UTC`, which are timestamps, and `TZ_FROM` for the zone the event is held in.
+
+### Participants and answers
+
+**Attendee User IDs** invites people: the node marks the event as a meeting, and everyone on the
+list gets an invitation to accept or decline. On Update the list replaces the current one. Removing
+every participant at once is the one case the API keeps to itself — it takes a meeting flag with an
+empty list, which the node cannot express; **Bitrix24 node → Method → Call** on
+`calendar.event.update` does it.
+
+**Meeting Settings** decides whether the organizer hears about answers, whether guests may invite
+others, whether the guest list is visible and whether an edit asks everyone to confirm again.
+
+**Get Meeting Status** and **Set Meeting Status** answer for the webhook user only, not for anyone
+else on the list, and they need an event that is a meeting: on an event with no participants Get
+fails with `Error while retrieving status` and Set answers success while storing nothing.
+
+**Get Availability** takes user IDs and a period and returns one row per user, with the events that
+fill their time — a user with nothing booked comes back with an empty list, which is what makes it
+usable for finding a free slot. Only events that take up time are counted: an event whose
+Accessibility is *Free* does not show up there, while *Busy* and an all-day event do.
+
+### Recurring events
+
+**Recurrence** repeats an event daily, weekly, monthly or yearly, with an interval, the weekdays it
+falls on, a number of repeats or a last day. Updating one of them asks which part of the series to
+change: the whole event, only this occurrence, or this one and the ones after it. The last two need
+the date of the occurrence you mean.
+
+A weekly rule always names its weekdays, and if you pick none the node uses the weekday the event
+starts on. That is not only the obvious meaning — Bitrix24 left to itself stores `{MO: MO}` for an
+event starting on any other day, and such an event then disappears from every list: it is created,
+it can be read by ID, and `calendar.event.get` never returns it.
+
+Changing part of a series makes Bitrix24 split it, and the answer can then be an object instead of
+an ID: `id` of the old series, `recEventId` of the new one, and the date and zone it starts at. The
+node passes through whichever of the two comes back.
+
+**Get Many** returns a row per occurrence in the period, not one row for the series, and the
+occurrences carry the `PARENT_ID` of the event the series belongs to.
+
+### Resource booking
+
+A booking resource is a room, a car, a piece of equipment — something clients take for a while.
+Technically a resource is a calendar and a booking is an event in it, but the two live under
+`calendar.resource.*` and the node keeps them there.
+
+**Create** adds a resource; it starts taking bookings once a resource booking field in a lead or
+deal form is set to offer it, which only the form editor can do. **Get Bookings** looks either at
+resources — everything booked for them — or at the booking IDs a CRM record holds, and Bitrix24
+takes one of the two, never both. The IDs come from a custom field of type `resourcebooking`, read
+with the Bitrix24 CRM node.
+
+### Settings
+
+**Get Portal Settings** reads the working hours, weekends and holidays every calendar of the portal
+follows; the API cannot change them. **Get User Settings** and **Update User Settings** work on the
+webhook user alone — its default view and calendar, whether tasks and declined events show, the
+synchronisation period, and the time zone the portal thinks that user is in, which is worth reading
+when event times come out shifted.
+
+Update keeps the settings you leave out: writing one flag left every other key of a live account
+as it was. **Settings (JSON)** covers what has no field of its own, `defaultReminders` and
+`defaultSections`.
+
 ## Bitrix24 Trigger
 
 Starts a workflow when Bitrix24 posts an outgoing webhook.
@@ -728,6 +843,29 @@ Drive:
   empty error code. Both are for application storage, so the node has no operations for them.
 - Errors with an empty code happen on Drive too: check `error_description`, not only `error`.
 
+Calendar:
+
+- A weekly rule with no weekday is stored as Monday, whatever day the event starts on, and the
+  event then never comes back from `calendar.event.get`: created, readable by ID, missing from
+  every list. The node names the weekday of the start instead.
+- `calendar.event.getNearest`, as the overview page of the documentation spells it, does not
+  exist: the method that answers is `calendar.event.get.nearest`.
+- The period of `calendar.event.get` is open at its end, so the same day in `from` and `to`
+  returns nothing, and a one-day event needs a `to` past it.
+- `from` and `to` are read as ISO dates. A day written the way the portal prints dates,
+  `16/09/2026`, is not understood and quietly widens the period by years instead of failing.
+- Dates in an answer are text in the portal's own format, not ISO; `DATE_FROM_TS_UTC` and
+  `DATE_TO_TS_UTC` are the timestamps to compare.
+- `calendar.event.getbyid` answers an empty object, not an error, for an event that was deleted.
+  The node turns that into `Bitrix24 has no event <ID>`.
+- The meeting-status methods need an event that is a meeting. On an event with no participants,
+  `calendar.meeting.status.get` answers `Error while retrieving status` and
+  `calendar.meeting.status.set` answers `true` without storing anything.
+- `calendar.accessibility.get` lists only what takes up time: an event whose accessibility is
+  `free` is not in it.
+- `calendar.user.settings.set` keeps the keys it is not given: writing one flag left every other
+  setting of a live account untouched.
+
 Chatbots:
 
 - A bot's chat background cannot be reset to each person's own once it is set. The documentation
@@ -853,6 +991,31 @@ webhook code, which the CRM node had been putting into its output since 0.1.0: e
 removes such values. If executions with CRM records that have files were shared or exported, make a
 new webhook and delete the old one.
 
+The calendar node was checked on 16.09.2026, all 21 operations, in a calendar the run created for
+the webhook user: plain, all-day and repeating events, a calendar renamed and deleted, booking
+resources, and the user settings written back exactly as they were read. No event had participants
+or CRM links, so nobody was invited or notified. Everything created was deleted at the end.
+
+| Bitrix24 Calendar | Operations |
+|---|---|
+| Write, checked | 15 |
+| Read, checked | 3 |
+| Works, with a Bitrix24 limitation | 3 |
+
+The limitations are the two meeting-status operations, which need an event that is a meeting, and
+Get Availability, which counts only events that take up time.
+
+That run found the weekly recurrence bug, fixed before this version: an event repeating weekly with
+no weekday picked was stored by Bitrix24 as repeating on Monday and then never came back from
+`calendar.event.get` — created, readable by ID, missing from every list. The node now names the
+weekday the event starts on. The same runs mapped the edges of the period Get Many reads, and which
+date formats Bitrix24 understands there.
+
+Besides the live runs, 26 offline checks read the request each operation builds: the dates and the
+time zone that go with them, the all-day form, the recurrence rule, the participant list turning an
+event into a meeting, the two ways of filtering bookings, and the settings Bitrix24 spells as `Y`
+and `N`.
+
 The trigger was fed hand-made deliveries (10 checks, including a wrong token and `__proto__`
 keys) and fetched a deal. A delivery from Bitrix24 itself needs an n8n with a public
 address. Offline, every operation runs with sample parameters, and every method the nodes call
@@ -860,8 +1023,11 @@ exists in the documentation.
 
 ## What is not here yet
 
-- Nodes for calendar, telephony, business processes and lists, the store and catalog,
+- Nodes for telephony, business processes and lists, the store and catalog,
   sites, booking, mail and BI. Until then, the Bitrix24 node calls their methods directly.
+- In the calendar node: clearing the participants of a meeting in one step, which needs a meeting
+  flag with an empty list (**Method → Call** does it), and handing an event over to another
+  organizer, which Bitrix24 has no method for at all.
 - A chatbot trigger for bots that post their events to a webhook URL. The polling trigger covers
   every event; a webhook one would save the polling delay on an n8n with a public address.
 - In the Drive node: switching a public link off and listing the trash, which the API cannot do;

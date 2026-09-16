@@ -41,6 +41,7 @@ body:
         - Bitrix24 Chatbot
         - Bitrix24 Chatbot Trigger
         - Bitrix24 Drive
+        - Bitrix24 Calendar
     validations:
       required: true
 

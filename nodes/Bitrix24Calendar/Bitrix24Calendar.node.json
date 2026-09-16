@@ -1,0 +1,36 @@
+{
+	"node": "@zenland-dev/n8n-nodes-bitrix24.bitrix24Calendar",
+	"nodeVersion": "1.0",
+	"codexVersion": "1.0",
+	"categories": ["Productivity"],
+	"resources": {
+		"credentialDocumentation": [
+			{
+				"url": "https://github.com/zenland-dev/n8n-nodes-bitrix24?tab=readme-ov-file#credentials"
+			}
+		],
+		"primaryDocumentation": [
+			{
+				"url": "https://github.com/zenland-dev/n8n-nodes-bitrix24?tab=readme-ov-file#bitrix24-calendar"
+			}
+		]
+	},
+	"alias": [
+		"Bitrix24",
+		"Bitrix",
+		"Битрикс24",
+		"Битрикс",
+		"Calendar",
+		"Календарь",
+		"Event",
+		"Событие",
+		"Meeting",
+		"Встреча",
+		"Schedule",
+		"Расписание",
+		"Booking",
+		"Бронирование",
+		"Availability",
+		"Занятость"
+	]
+}

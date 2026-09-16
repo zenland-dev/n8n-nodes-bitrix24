@@ -1,6 +1,7 @@
 import type { IDataObject, IExecuteFunctions, INodeExecutionData, INodeProperties } from 'n8n-workflow';
 import { NodeOperationError } from 'n8n-workflow';
 
+import { instantOf, wallDateTime, wallParts } from '../../../shared/datetime';
 import { downloadToBinary } from '../../../shared/download';
 import { asNodeError } from '../../../shared/errors';
 import { extractRows, PAGE_SIZE } from '../../../shared/list';
@@ -197,50 +198,6 @@ export const inputBinaryProperty: INodeProperties = {
 	hint: 'The name of the input binary field containing the file to be uploaded',
 };
 
-interface WallParts {
-	year: number;
-	month: number;
-	day: number;
-	hour: number;
-	minute: number;
-	second: number;
-}
-
-function wallParts(date: Date, timeZone: string): WallParts {
-	const parts = Object.fromEntries(
-		new Intl.DateTimeFormat('en-GB', {
-			timeZone,
-			year: 'numeric',
-			month: '2-digit',
-			day: '2-digit',
-			hour: '2-digit',
-			minute: '2-digit',
-			second: '2-digit',
-			hourCycle: 'h23',
-		})
-			.formatToParts(date)
-			.map((p) => [p.type, p.value]),
-	);
-	return { year: +parts.year, month: +parts.month, day: +parts.day, hour: +parts.hour, minute: +parts.minute, second: +parts.second };
-}
-
-const pad = (n: number): string => String(n).padStart(2, '0');
-const wallText = (p: WallParts): string => `${p.year}-${pad(p.month)}-${pad(p.day)} ${pad(p.hour)}:${pad(p.minute)}:${pad(p.second)}`;
-
-/** An instant from the value of a dateTime parameter; a value without an offset is in `timeZone`. */
-function instantOf(value: string, timeZone: string): Date | undefined {
-	if (/(Z|[+-]\d{2}:?\d{2})$/.test(value)) {
-		const date = new Date(value);
-		return Number.isNaN(date.getTime()) ? undefined : date;
-	}
-	const m = value.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?/);
-	if (!m) return undefined;
-	const guess = Date.UTC(+m[1], +m[2] - 1, +m[3], +(m[4] ?? 0), +(m[5] ?? 0), +(m[6] ?? 0));
-	const seen = wallParts(new Date(guess), timeZone);
-	const offset = Date.UTC(seen.year, seen.month - 1, seen.day, seen.hour, seen.minute, seen.second) - guess;
-	return new Date(guess - offset);
-}
-
 /**
  * A date for a Drive filter. Drive compares the value as a wall-clock time in the webhook
  * user's time zone and does not read offsets: a value ending in Z or in a UTC offset matched
@@ -258,7 +215,7 @@ export async function driveFilterDate(ctx: IExecuteFunctions, value: unknown, it
 	const zone = String((profile.result as IDataObject | null)?.TIME_ZONE ?? '');
 	if (zone !== '') {
 		try {
-			return wallText(wallParts(instant, zone));
+			return wallDateTime(wallParts(instant, zone));
 		} catch {
 			// An IANA name this Node.js does not know: fall back to the portal offset below.
 		}
@@ -266,7 +223,7 @@ export async function driveFilterDate(ctx: IExecuteFunctions, value: unknown, it
 	const time = await bitrix24Request.call(ctx, 'server.time', {}, { itemIndex });
 	const offset = String(time.result ?? '').match(/([+-])(\d{2}):?(\d{2})$/);
 	const minutes = offset ? (offset[1] === '-' ? -1 : 1) * (+offset[2] * 60 + +offset[3]) : 0;
-	return wallText(wallParts(new Date(instant.getTime() + minutes * 60_000), 'UTC'));
+	return wallDateTime(wallParts(new Date(instant.getTime() + minutes * 60_000), 'UTC'));
 }
 
 /** getFields answers {NAME: {TYPE, USE_IN_FILTER, USE_IN_SHOW}}: one row per field. */
