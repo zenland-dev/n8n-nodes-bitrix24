@@ -54,19 +54,19 @@ export const folderResource: Resource = {
 				{ ...folderIdProperty, displayName: 'Parent Folder ID', description: 'ID of the folder to create the new one in', displayOptions: folderOnly },
 				{ ...storageIdProperty, displayOptions: storageOnly },
 				{ displayName: 'Folder Name', name: 'folderName', type: 'string', required: true, default: '', description: 'A folder with this name must not exist there yet' },
-				{ ...rightsProperty, displayOptions: storageOnly },
+				rightsProperty,
 			],
 			async execute(itemIndex) {
 				const name = String(this.getNodeParameter('folderName', itemIndex)).trim();
 				if (name === '') throw new NodeOperationError(this.getNode(), 'Folder Name is empty', { itemIndex });
-				if (String(this.getNodeParameter('createIn', itemIndex)) === 'storage') {
-					const params: IDataObject = { id: readId(this, 'storageId', itemIndex, 'Storage ID'), data: { NAME: name } };
-					const rights = readRights(this, itemIndex, 'rights.right');
-					if (rights.length > 0) params.rights = rights;
-					const body = await bitrix24Request.call(this, 'disk.storage.addFolder', params, { itemIndex });
-					return objectResult(this, body.result, 'create the folder', itemIndex);
-				}
-				const body = await bitrix24Request.call(this, 'disk.folder.addSubFolder', { id: folderId(this, itemIndex), data: { NAME: name } }, { itemIndex });
+				const inStorage = String(this.getNodeParameter('createIn', itemIndex)) === 'storage';
+				const params: IDataObject = {
+					id: inStorage ? readId(this, 'storageId', itemIndex, 'Storage ID') : folderId(this, itemIndex),
+					data: { NAME: name },
+				};
+				const rights = readRights(this, itemIndex, 'rights.right');
+				if (rights.length > 0) params.rights = rights;
+				const body = await bitrix24Request.call(this, inStorage ? 'disk.storage.addFolder' : 'disk.folder.addSubFolder', params, { itemIndex });
 				return objectResult(this, body.result, 'create the folder', itemIndex);
 			},
 		},

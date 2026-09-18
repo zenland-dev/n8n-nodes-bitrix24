@@ -1,5 +1,78 @@
 # Changelog
 
+## 0.8.2 — 18.09.2026
+
+The first published version of the two new nodes: 0.8.0 and 0.8.1 below were written and tested but
+never released, and everything in them is part of this one.
+
+- **Field → Create of the lists node takes a Field Code**, and requires it: `lists.field.add`
+  refuses a field without one — `ERROR_SAVE_FIELD`, "Please fill the code fields" — although the
+  documentation marks `CODE` optional.
+- **Template → Get Many and Workflow → Get Instances ask for fields by default.** Given no field
+  list, Bitrix24 answers templates as rows of `ID` alone and running processes as `ID`, `MODIFIED`
+  and `OWNED_UNTIL`. Left empty, **Fields to Return** now sends the usual fields instead.
+- **Only a business process that is still waiting can be stopped.** A process whose template runs
+  straight through is over before the next request arrives, and Terminate and Delete then answer
+  "The business process is not found". The README says so next to both.
+- Checked on a live portal: all 19 operations of the lists node, on a list the run created and
+  deleted, a file field and its link included; 7 of the 10 of the business process node, on a deal
+  the run created in its own pipeline with a template made for the test — three processes started,
+  one answered through Task → Complete, one terminated, one deleted, each confirmed by Get
+  Instances. Delegate needs a second person and the two Event operations the event token of an
+  installed application, so those three are unproven.
+
+
+## 0.8.1 — 17.09.2026
+
+- **Drive → Folder → Create takes Access Rights for a folder inside another folder.**
+  `disk.folder.addSubFolder` began accepting `rights` on 17.09.2026, and the field, which until
+  now only showed for a folder at the root of a drive, is offered for both. Nothing changes for a
+  workflow that leaves it empty: without a filled-in row the request goes out as before.
+- **An access right can now deny instead of grant.** The new Deny switch sends `NEGATIVE`, which
+  takes the level away from whoever the access code names and overrides what the parent folder
+  passes down. It is there for a folder, for a drive root and for an uploaded file.
+- Bitrix24 checks each right now and answers an unusable one with an empty error code and the
+  reason in the description alone — `Invalid format: Right 0 should contain known TASK_ID` for an
+  access level the portal does not have. The node shows that text, so pick the level from the list
+  rather than typing an ID from another portal.
+- **Calendar → Event → Get Upcoming really reads the calendar you pick.** Bitrix24 answers
+  `calendar.event.get.nearest` with the webhook user's own calendar unless `type` and `ownerId`
+  arrive together *and* `forCurrentUser` is off — a missing `forCurrentUser` counts as on. The node
+  used to send the type alone, so Calendar Type looked like it worked and changed nothing. It now
+  sends the owner with the type and turns `forCurrentUser` off unless the option is set by hand;
+  a group calendar without Owner ID is refused the way the other operations refuse it.
+  **This changes what the operation returns** for a workflow that picked Company or Group and left
+  For the Webhook User alone: it was answering the personal calendar and now answers the one asked
+  for.
+
+## 0.8.0 — 16.09.2026
+
+- **Bitrix24 Business Processes**, a new node: 10 operations across 4 resources. A business process
+  started from a template on one record, the running processes listed and filtered, one of them
+  terminated with a line for the log or deleted with its data. The tasks a process puts in front of
+  people — read, answered for the webhook user, or delegated to somebody else. The templates of the
+  portal, filtered by the kind of record they run on. And the answer back to a process that waits on
+  an automation rule: a result, or a line in its log.
+- The record a process runs on is picked as a type and an ID, and the node writes out the three
+  strings Bitrix24 wants: `['crm', 'CCrmDocumentDeal', 'DEAL_777']` for a deal,
+  `['crm', 'Bitrix\Crm\Integration\BizProc\Document\Dynamic', 'DYNAMIC_147_1']` for a smart
+  process item. A smart process item, a list element and a Drive file also need the ID of the
+  process, the list or the storage they belong to.
+- Most `bizproc.*` methods are documented as administrator-only, so a webhook made by anyone else
+  gets `ACCESS_DENIED` from Bitrix24. The README says so next to the node.
+- Not included: automation rules, actions and template writing. `bizproc.robot.*`,
+  `bizproc.activity.*` except the log, and `bizproc.workflow.template.add/update/delete` answer
+  `ACCESS_DENIED Application context required` to a webhook — they need an installed application.
+- **Bitrix24 Lists**, a new node: 19 operations across 4 resources, one per documented `lists.*`
+  method. Elements read with a filter by field code, created, changed and deleted; the links of
+  their file fields. Lists themselves created, renamed and deleted, and the type of one found from
+  its ID. Fields with their codes and types, which is what every element operation needs, and the
+  types a list allows. Sections, the folders elements are grouped into.
+- Both nodes were written from the REST documentation read on 16.09.2026, and 26 offline checks in
+  `_probes` read the request each operation builds.
+- No change to any published parameter, operation or credential of the other nodes.
+
+
 ## 0.7.0 — 16.09.2026
 
 - **Bitrix24 Employees**, a new node: 32 operations across 6 resources. Employees found by any field

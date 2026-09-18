@@ -1,0 +1,35 @@
+{
+	"node": "@zenland-dev/n8n-nodes-bitrix24.bitrix24BizProc",
+	"nodeVersion": "1.0",
+	"codexVersion": "1.0",
+	"categories": ["Productivity"],
+	"resources": {
+		"credentialDocumentation": [
+			{
+				"url": "https://github.com/zenland-dev/n8n-nodes-bitrix24?tab=readme-ov-file#credentials"
+			}
+		],
+		"primaryDocumentation": [
+			{
+				"url": "https://github.com/zenland-dev/n8n-nodes-bitrix24?tab=readme-ov-file#bitrix24-business-processes"
+			}
+		]
+	},
+	"alias": [
+		"Bitrix24",
+		"Bitrix",
+		"Битрикс24",
+		"Битрикс",
+		"Business Process",
+		"Бизнес-процесс",
+		"Workflow",
+		"Процесс",
+		"Approval",
+		"Согласование",
+		"Automation",
+		"Автоматизация",
+		"Template",
+		"Шаблон",
+		"BizProc"
+	]
+}

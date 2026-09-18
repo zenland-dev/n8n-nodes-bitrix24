@@ -2,20 +2,22 @@
 
 n8n community nodes for [Bitrix24](https://www.bitrix24.com): a CRM node with 268 operations
 across 42 resources, a tasks node with 129 operations across 17 resources, a messenger node with
-63 operations, an open lines node with 43, a Drive node with 36, a chatbot node with 34, a calendar
-node with 21, an employees node with 32, a node that calls any of the ~1400 REST methods by name or
-in batches, a trigger for outgoing webhooks, and two triggers that need no public URL: one for chat
-messages, one for messages and commands sent to a bot.
+63 operations, an open lines node with 43, a Drive node with 36, a chatbot node with 34, an
+employees node with 32, a calendar node with 21, a lists node with 19, a business process node with
+10, a node that calls any of the ~1400 REST methods by name or in batches, a trigger for outgoing
+webhooks, and two triggers that need no public URL: one for chat messages, one for messages and
+commands sent to a bot.
 
 Written from scratch against the official REST documentation
 ([bitrix24/b24restdocs](https://github.com/bitrix24/b24restdocs), read on 14.09.2026). No code
 from any other package.
 
-**Status: 0.7.0.** Every operation of the CRM, Drive, chatbot and calendar nodes was run against a
-live Bitrix24 portal, 29 of the 32 of the employees node, 116 of the 129 of the tasks node, 57 of the 63 of the messenger node and 14 of the 43 of
-the open lines node: reads as they are, writes on objects the test created and deleted. What was not run, and
-why, is under [What was checked](#what-was-checked). Operations that work with a limitation of
-Bitrix24 itself are listed under [Quirks](#quirks-worth-knowing).
+**Status: 0.8.2.** Every operation of the CRM, Drive, chatbot, calendar and lists nodes was run
+against a live Bitrix24 portal, 29 of the 32 of the employees node, 116 of the 129 of the tasks
+node, 57 of the 63 of the messenger node, 14 of the 43 of the open lines node and 7 of the 10 of the
+business process node: reads as they are, writes on objects the test created and deleted. What was
+not run, and why, is under [What was checked](#what-was-checked). Operations that work with a
+limitation of Bitrix24 itself are listed under [Quirks](#quirks-worth-knowing).
 
 - [Installation](#installation)
 - [Credentials](#credentials)
@@ -28,6 +30,8 @@ Bitrix24 itself are listed under [Quirks](#quirks-worth-knowing).
 - [Bitrix24 Drive](#bitrix24-drive)
 - [Bitrix24 Calendar](#bitrix24-calendar)
 - [Bitrix24 Employees](#bitrix24-employees)
+- [Bitrix24 Business Processes](#bitrix24-business-processes)
+- [Bitrix24 Lists](#bitrix24-lists)
 - [Bitrix24 Trigger](#bitrix24-trigger)
 - [Bitrix24 Messenger Trigger](#bitrix24-messenger-trigger)
 - [Bitrix24 Chatbot Trigger](#bitrix24-chatbot-trigger)
@@ -57,8 +61,8 @@ node and its trigger use **Bitrix24 Chatbot Webhook API**: the same fields plus 
 Create the webhook in Bitrix24 under **Developer resources → Other → Inbound webhook** and tick
 the permissions the workflows need: `crm` for the CRM node; `task`, `tasks` and `sonet_group`
 for the tasks node; `im` for the messenger node and its trigger; `imopenlines` for the open lines
-node, plus `crm` for its CRM chats; `disk` for the Drive node; plus whatever modules you call
-through the Bitrix24 node. The webhook acts as the user who created it and sees only what that
+node, plus `crm` for its CRM chats; `disk` for the Drive node; `bizproc` for the business process
+node and `lists` for the lists node; plus whatever modules you call through the Bitrix24 node. The webhook acts as the user who created it and sees only what that
 user may see, so a webhook made by a sales manager cannot read another manager's deals.
 
 The credential has three fields instead of one URL.
@@ -496,6 +500,14 @@ ID, or a storage ID with *Drive Root*.
 A webhook made by an administrator sees the drive of every user and workgroup, so **Storage → Get
 Many** with Return All can take many requests.
 
+**Access Rights** on both operations hand the new folder or file to someone besides whoever the
+parent folder already lets in: an access code (`U35` a user, `D12` a department, `DR12` that
+department with the ones under it, `*` everybody) and a level from the portal's own list. *Deny*
+turns a row around — it takes the level away from that person and beats the rights the parent
+folder passes down, which is how you keep one folder out of sight inside a shared one. Rights on a
+folder inside a folder work since 17.09.2026; before that Bitrix24 took them only at a drive root,
+and **Folder → Share With User** was the only way to hand over a subfolder afterwards.
+
 ### Upload and download
 
 **Upload** takes a file from binary data and sends it inside the request, base64-encoded; a 10 MB
@@ -575,6 +587,13 @@ Every event belongs to an owner, and the owner is two parameters: **Calendar Typ
 ID**. For a user calendar, Owner ID 0 means the user the webhook acts as, and the node fills in its
 ID. A group calendar has no default owner, so it needs the ID of the workgroup or project. The
 company calendar always has owner 0.
+
+**Event → Get Upcoming** is the one place where the owner is optional, and Bitrix24 has a trap
+there: it reads the webhook user's own calendar unless the type and the owner arrive together and
+*For the Webhook User* is off, and a missing *For the Webhook User* counts as on. The node sends
+the owner whenever Calendar Type is set and turns the flag off unless you set it yourself, so
+picking Company or Group gets you that calendar. Leave Calendar Type out and you get what the
+method gives by default: the events of the webhook user across their calendars.
 
 One owner can keep several calendars — work, trips, a project. **Calendar** lists, adds, renames
 and deletes them, and in **Event → Create** the *Calendar* parameter either names one or leaves the
@@ -740,6 +759,111 @@ reports the webhook user may read.
 **Office Network** holds the address ranges that count as the office. **Set** replaces the whole
 list — whatever is not in the request stops being the office — so read the current ranges first and
 send them back together with the new one.
+
+## Bitrix24 Business Processes
+
+Business processes of the portal: starting one on a record, seeing what runs, and answering the
+tasks a process puts in front of people. The webhook needs the `bizproc` permission, **and the
+webhook has to belong to an administrator** — Bitrix24 answers `ACCESS_DENIED` to everyone else on
+most of these methods.
+
+| Resource | Operations |
+|---|---|
+| **Workflow** | Start, Get Instances, Terminate, Delete |
+| **Task** | Get Many, Complete, Delegate |
+| **Template** | Get Many |
+| **Event** | Send Result, Write Log |
+
+### Naming the record
+
+A process always runs on a document, and Bitrix24 names one with three strings: a module, a PHP
+class and an ID. The node asks for **Document Type** and **Record ID** instead and writes them out:
+
+| Document Type | What goes to Bitrix24 |
+|---|---|
+| Deal, Lead, Contact, Company | `['crm', 'CCrmDocumentDeal', 'DEAL_777']` |
+| Quote, Invoice | `['crm', 'Bitrix\Crm\Integration\BizProc\Document\Quote', 'QUOTE_5']` |
+| Smart Process Item | `['crm', '…\Document\Dynamic', 'DYNAMIC_147_1']`, with **Container ID** the process |
+| List Element, News Feed Process | `['lists', 'Bitrix\Lists\BizprocDocumentLists', '9']`, with **Container ID** the list |
+| Drive File | `['disk', 'Bitrix\Disk\BizProcDocument', '88']`, with **Container ID** the storage |
+
+Three of them carry a container: a smart process item, a list element and a Drive file are only
+addressable together with the process, the list or the storage they live in. **Container ID** shows
+up for those three and is required there.
+
+**Template → Get Many** uses the same picker to answer a narrower question — which templates can run
+on deals — and sends the type without a record: `['crm', 'CCrmDocumentDeal', 'DEAL']`.
+
+### Starting and stopping
+
+**Workflow → Start** takes the template ID and the record, and answers a workflow ID: a string like
+`66e412fdc9bd44.36306599`, not a number. Every other Workflow operation takes that string.
+
+**Terminate** stops a process and keeps what it has done, with an optional line for the log.
+**Delete** removes the process and its data altogether. **Get Instances** lists what is running,
+filtered by template, by starter or by record, and adds `entityType` and `entityId` next to
+Bitrix24's own `DEAL_777`.
+
+### Tasks of a process
+
+A running process stops at a person: approve this, acknowledge that, fill in a number. **Task → Get
+Many** reads those, **Complete** answers one, **Delegate** hands several to somebody else.
+
+Which answers a task takes depends on its kind, and the API does not say which kind it is: an
+approval takes Yes and No, a notice takes Acknowledged, a request for information takes
+Acknowledged and sometimes Cancel. A wrong answer comes back as an error from Bitrix24, not from
+the node. What a task asks for beyond the answer is in `PARAMETERS.Fields` of Get Many, and those
+values go into **Fields (JSON)** of Complete.
+
+Complete answers for the user the webhook belongs to, and only that user's own tasks.
+
+### Answering a waiting process
+
+**Event → Send Result** is the other direction: a process is paused on an automation rule or an
+action that waits for an outside answer, and this hands it back. It needs the event token that the
+rule posted, so the parameter is filled from the workflow input, not typed in.
+
+Those waiting rules and actions are registered by an installed application — `bizproc.robot.add` and
+`bizproc.activity.add` refuse a webhook — so this pair is useful when such an application is already
+on the portal. **Write Log** puts a line into the process log through the same token, for a long job
+that wants to report progress. Both need logging switched on in the template.
+
+## Bitrix24 Lists
+
+Universal lists: the tables a portal keeps next to the CRM — requests, contracts, registries — with
+their elements, fields and sections. The webhook needs the `lists` permission.
+
+| Resource | Operations |
+|---|---|
+| **Element** | Get Many, Create, Update, Delete, Get File URL |
+| **List** | Get Many, Create, Update, Delete, Get Type |
+| **Field** | Get Many, Get Types, Create, Update, Delete |
+| **Section** | Get Many, Create, Update, Delete |
+
+### Naming the list
+
+Every operation names the list twice. **List Type** is where it lives — universal lists of the
+portal, group lists inside a workgroup, or process lists of the news feed — and then **List ID** or
+**List Code** says which one. Bitrix24 refuses the call when the type does not match the list, and
+**List → Get Type** answers the type when only the ID is known. A self-hosted portal with its own
+information block types has **Custom List Type** for them; it needs the list named by ID or code.
+
+### Fields carry the codes
+
+An element's values live under field codes, not names: `PROPERTY_951`, `PROPERTY_1003`. **Field →
+Get Many** is what gives them, so a workflow that writes elements usually reads the fields first.
+Those codes go into **Fields (JSON)** of Create and Update and into the filter of Get Many
+(`{"=PROPERTY_951": 1269}`). A field set as multiple takes an array even for one value.
+
+**Field → Create** fixes the type once and for all: Bitrix24 does not change the type of an existing
+field, and Update wants the type passed again unchanged. Values of a List field go in as
+**Values of a List Field**, one per line.
+
+### Files of an element
+
+**Element → Get File URL** answers the links of a File or File (Drive) field — paths on the portal
+like `/bitrix/tools/disk/uf.php?attachedId=103&action=download`, one per value. **Field ID** here is
+the number without the `PROPERTY_` prefix: `951` for `PROPERTY_951`.
 
 ## Bitrix24 Trigger
 
@@ -971,6 +1095,26 @@ Chatbots:
 - In a response with no forwarded messages, `uuidMap` is an empty array; the node turns it into an
   empty object, the shape it has with forwards.
 
+### Business processes and lists
+
+**A new list field needs a code.** `lists.field.add` answers `ERROR_SAVE_FIELD`, "Please fill the
+code fields", without one, although the documentation marks `CODE` optional. **Field → Create** has
+it as a required parameter for that reason.
+
+**Two business process list methods answer almost nothing by default.**
+`bizproc.workflow.template.list` returns rows of `ID` alone when no field list is given, and
+`bizproc.workflow.instances` returns `ID`, `MODIFIED` and `OWNED_UNTIL`. Left empty, **Fields to
+Return** therefore sends the usual fields rather than nothing.
+
+**A workflow ID is a string.** `bizproc.workflow.instances` answers IDs like
+`66e412fdc9bd44.36306599`, 23 characters; Terminate and Delete take that string, whatever the
+documentation says about the type of `bizproc.workflow.kill`.
+
+**Only a process that is still waiting can be stopped.** A process whose template runs straight
+through is over before the next request arrives, and Terminate and Delete then answer "The business
+process is not found" rather than a success. Both were checked on a process waiting for a decision:
+there they answer `true` and the process leaves Get Instances at once.
+
 ## What was checked
 
 Against a live Bitrix24 portal, 14.09.2026, through a harness that runs the compiled nodes with
@@ -1127,6 +1271,32 @@ Besides that, 23 offline checks read the request each operation builds: the flat
 list, dismissal as `ACTIVE: N`, ATOM times for the timesheet, the settings Bitrix24 spells in two
 cases at once, and the refusals the node makes on its own.
 
+The lists node was checked in full on a list the run created and deleted: fields of two types, a
+section, an element with a number and a file, the filter by field code, the file link, and the
+deletions in the order Bitrix24 allows. Nothing outside that list was written.
+
+| Bitrix24 Lists | Operations |
+|---|---|
+| Write, checked | 12 |
+| Read, checked | 7 |
+| Not checked | 0 |
+
+The business process node was checked on a deal the run created in its own pipeline, with a template
+made for the test: a manual start on deals, a comment and then a decision the process waits for.
+Three processes were started on that deal — one answered through **Task → Complete**, one stopped
+with **Terminate**, one removed with **Delete** — and each time **Get Instances** confirmed what
+happened. The comment the template leaves on the deal is the proof a process really went through.
+
+Left unproven: **Task → Delegate**, which hands work to a second person, and **Event → Send Result**
+and **Write Log**, which need the event token only a rule registered by an installed application
+receives.
+
+| Bitrix24 Business Processes | Operations |
+|---|---|
+| Write, checked | 4 |
+| Read, checked | 3 |
+| Not checked: a second person, and an application's event token | 3 |
+
 The trigger was fed hand-made deliveries (10 checks, including a wrong token and `__proto__`
 keys) and fetched a deal. A delivery from Bitrix24 itself needs an n8n with a public
 address. Offline, every operation runs with sample parameters, and every method the nodes call
@@ -1134,9 +1304,14 @@ exists in the documentation.
 
 ## What is not here yet
 
-- Nodes for telephony, business processes and lists, the store and catalog,
-  sites, booking, mail, the activity stream and BI. Until then, the Bitrix24 node calls their
-  methods directly.
+- Nodes for telephony, the store and catalog, sites, booking, mail, the activity stream and BI.
+  Until then, the Bitrix24 node calls their methods directly.
+- In the business process node: automation rules, actions and templates cannot be created,
+  changed or even listed — `bizproc.robot.*`, `bizproc.activity.*` except the log, and
+  `bizproc.workflow.template.add/update/delete` all answer `ACCESS_DENIED Application context
+  required` to a webhook. They need the OAuth2 credential of a local application.
+- RPA, the 30 methods of `rpa.*`: Bitrix24 moved the whole section to the outdated part of its
+  documentation, so there is nothing to wrap.
 - The newer `humanresources.*` org structure, 24 methods Bitrix24 is moving departments to. A
   portal without it answers `ERROR_METHOD_NOT_FOUND`, so there was nothing to check them against.
 - In the calendar node: clearing the participants of a meeting in one step, which needs a meeting

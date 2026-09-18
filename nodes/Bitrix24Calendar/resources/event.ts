@@ -514,7 +514,7 @@ export const eventResource: Resource = {
 								{ name: 'Group', value: GROUP_TYPE },
 								{ name: 'User', value: USER_TYPE },
 							],
-							description: 'Read one kind of calendar instead of every calendar of the user',
+							description: 'Read one kind of calendar instead of the calendars of the webhook user. A group calendar needs Owner ID too.',
 						},
 						{
 							displayName: 'Days Ahead',
@@ -529,14 +529,15 @@ export const eventResource: Resource = {
 							name: 'forCurrentUser',
 							type: 'boolean',
 							default: true,
-							description: 'Whether to list only the events the webhook user takes part in',
+							description:
+								'Whether to list only the events the webhook user takes part in. Bitrix24 reads their own calendar while this is on and pays no attention to Calendar Type.',
 						},
 						{
 							displayName: 'Owner ID',
 							name: 'ownerId',
 							type: 'number',
 							default: 0,
-							description: 'Owner of the calendar to read, together with Calendar Type',
+							description: 'Whose calendar to read, together with Calendar Type: the user of a user calendar, the workgroup of a group one. 0 means the webhook user.',
 						},
 					],
 				},
@@ -547,12 +548,30 @@ export const eventResource: Resource = {
 				const limit = returnAll ? undefined : (this.getNodeParameter('limit', itemIndex) as number);
 
 				const params: IDataObject = compact({
-					type: options.type,
 					ownerId: Number(options.ownerId ?? 0) > 0 ? Number(options.ownerId) : undefined,
 					days: Number(options.days ?? 0) > 0 ? Number(options.days) : undefined,
 					forCurrentUser: options.forCurrentUser,
 					maxEventsCount: limit,
 				});
+
+				// Bitrix24 falls back to the calendar of the webhook user unless `type` and `ownerId`
+				// arrive together with `forCurrentUser` off — a type on its own is ignored, and so is
+				// a missing `forCurrentUser`, which the method reads as true. Checked on a live portal
+				// 17.09.2026: type company_calendar alone answered the user's own 29 events, with
+				// ownerId 0 and forCurrentUser false the company calendar's own.
+				if (options.type !== undefined) {
+					const type = String(options.type);
+					const ownerId = Number(options.ownerId ?? 0) || 0;
+					if (type === GROUP_TYPE && ownerId <= 0) {
+						throw new NodeOperationError(this.getNode(), 'Owner ID is the workgroup a group calendar belongs to', {
+							itemIndex,
+							description: 'Fill in the ID of the workgroup or project. Bitrix24 has no default owner for a group calendar.',
+						});
+					}
+					params.type = type;
+					params.ownerId = ownerId;
+					params.forCurrentUser = options.forCurrentUser ?? false;
+				}
 
 				const body = await bitrix24Request.call(this, 'calendar.event.get.nearest', params, { itemIndex });
 				const rows = extractRows(body.result);

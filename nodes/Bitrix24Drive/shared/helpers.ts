@@ -96,7 +96,7 @@ export function jsonObject(ctx: IExecuteFunctions, name: string, itemIndex: numb
 	return jsonParameter<IDataObject>(ctx, name, itemIndex, {});
 }
 
-/** Access rights of a new file or folder: [{TASK_ID, ACCESS_CODE}]. */
+/** Access rights of a new file or folder: [{TASK_ID, ACCESS_CODE, NEGATIVE}]. */
 export const rightsProperty: INodeProperties = {
 	displayName: 'Access Rights',
 	name: 'rights',
@@ -127,6 +127,13 @@ export const rightsProperty: INodeProperties = {
 					description:
 						'Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>',
 				},
+				{
+					displayName: 'Deny',
+					name: 'negative',
+					type: 'boolean',
+					default: false,
+					description: 'Whether to take this level away instead of granting it, which overrides what the parent folder passes down',
+				},
 			],
 		},
 	],
@@ -136,7 +143,13 @@ export function readRights(ctx: IExecuteFunctions, itemIndex: number, path: stri
 	const entries = (ctx.getNodeParameter(path, itemIndex, []) ?? []) as IDataObject[];
 	return entries
 		.filter((e) => String(e.accessCode ?? '').trim() !== '' && String(e.taskId ?? '') !== '')
-		.map((e) => ({ TASK_ID: Number(e.taskId), ACCESS_CODE: String(e.accessCode).trim() }));
+		.map((e) => {
+			const right: IDataObject = { TASK_ID: Number(e.taskId), ACCESS_CODE: String(e.accessCode).trim() };
+			// Bitrix24 reads NEGATIVE as a boolean and refuses anything else; the key is left
+			// out when the right grants, so the body stays what it was before Deny existed.
+			if (e.negative === true) right.NEGATIVE = 1;
+			return right;
+		});
 }
 
 /** A link Bitrix24 gave, made absolute: attachment links may start with /bitrix/…. */
