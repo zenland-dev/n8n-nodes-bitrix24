@@ -43,6 +43,9 @@ body:
         - Bitrix24 Drive
         - Bitrix24 Calendar
         - Bitrix24 Employees
+        - Bitrix24 Business Processes
+        - Bitrix24 Lists
+        - Bitrix24 Catalog
     validations:
       required: true
 

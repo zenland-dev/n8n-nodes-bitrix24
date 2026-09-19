@@ -176,3 +176,80 @@ export async function bitrix24Request(
 		throw toNodeApiError(this.getNode(), method, failure, body, options.itemIndex);
 	}
 }
+
+/** A file a REST method answered with instead of JSON. */
+export interface Bitrix24FileAnswer {
+	buffer: Buffer;
+	headers: IDataObject;
+}
+
+/**
+ * One call to a REST method that answers with the file itself, e.g. catalog.product.download
+ * (seen on a live portal, 19.09.2026: the body is the image, with Content-Disposition). A JSON
+ * body is an error and is raised as one. Only reads take this path, so they are retried like
+ * reads.
+ */
+export async function bitrix24FileRequest(
+	this: Bitrix24Context,
+	method: string,
+	params: IDataObject,
+	options: Bitrix24RequestOptions = {},
+): Promise<Bitrix24FileAnswer> {
+	if (!METHOD_NAME.test(method)) {
+		throw new NodeOperationError(this.getNode(), `"${method}" is not a Bitrix24 method name`, { itemIndex: options.itemIndex });
+	}
+	const portal = await resolvePortal.call(this, options.credentialType ?? WEBHOOK_CREDENTIAL);
+	const request: IHttpRequestOptions = {
+		method: 'POST',
+		url: `${portal.baseUrl}/rest/${portal.token}/${method}.json`,
+		body: params,
+		encoding: 'arraybuffer',
+		returnFullResponse: true,
+		ignoreHttpStatusErrors: true,
+		headers: { 'Content-Type': 'application/json' },
+	};
+	const maxAttempts = options.maxAttempts ?? 4;
+
+	for (let attempt = 1; ; attempt++) {
+		await acquireSlot(portal.baseUrl, portal.requestsPerSecond, 1000);
+		let response: IDataObject;
+		try {
+			response = (await this.helpers.httpRequest(request)) as IDataObject;
+		} catch (error) {
+			if (attempt < maxAttempts) {
+				await sleep(backoffDelay(attempt));
+				continue;
+			}
+			throw new NodeApiError(
+				this.getNode(),
+				{ message: 'Network error' },
+				{
+					message: `Bitrix24 ${method}: the portal could not be reached`,
+					description: error instanceof Error ? error.message.split(portal.token).join('***') : undefined,
+					itemIndex: options.itemIndex,
+				},
+			);
+		}
+
+		const status = Number(response.statusCode) || 0;
+		const headers = (response.headers ?? {}) as IDataObject;
+		const buffer = Buffer.from(response.body as ArrayBuffer);
+		const json = String(headers['content-type'] ?? '').includes('json');
+		if (!json && status >= 200 && status < 300) return { buffer, headers };
+
+		let body: unknown = undefined;
+		if (json) {
+			try {
+				body = JSON.parse(buffer.toString('utf8'));
+			} catch {
+				body = undefined;
+			}
+		}
+		const failure = readFailure(body, status) ?? { code: '', description: `HTTP ${status}`, status };
+		if ((RETRY_ALWAYS.has(failure.code) || RETRY_READS.has(failure.code) || status >= 502) && attempt < maxAttempts) {
+			await sleep(backoffDelay(attempt));
+			continue;
+		}
+		throw toNodeApiError(this.getNode(), method, failure, body, options.itemIndex);
+	}
+}

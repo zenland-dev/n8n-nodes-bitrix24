@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.9.0 — 19.09.2026
+
+- **New node: Bitrix24 Catalog.** 148 operations across 26 resources, one for each of the 145
+  working `catalog.*` methods and three more: products, variations, products with variations and
+  services; their images and files; prices and price types with their names, access and rounding;
+  markups; sections; properties with list values, features and smart filter settings; units of
+  measure, VAT rates and unit ratios; stores and stock; inventory documents with their items,
+  suppliers and custom fields; the catalogs themselves. **Catalog** can be left empty everywhere —
+  the node takes the catalog the CRM uses, or the variations catalog tied to it.
+- Property values go in by property ID or code. The node wraps each one as `{"value": …}`:
+  `catalog.product.update` ignores a bare text value and clears a bare number while answering success.
+- **Set Product Prices** sets prices by price type and keeps their IDs; **Replace Product Prices**
+  replaces the whole set through `catalog.price.modify`, which refuses any price that names its ID
+  ("Catalog price group is wrong") in spite of the documentation.
+- **Download File** fetches a picture or a file property through `catalog.product.download`, with
+  the field named `detailPicture` or `property258`; the documented `DETAIL_PICTURE` and
+  `PROPERTY_258` are refused. **Product Image → Download** fetches the public `detailUrl`: the
+  `downloadUrl` Bitrix24 gives carries the webhook secret and answers `ERROR_METHOD_NOT_FOUND`, so it
+  never reaches the output.
+- **Bitrix24 Trigger** lists the 15 catalog events, `CATALOG.PRODUCT.ON.ADD` and the like, which the
+  event list extracted from the documentation had missed for their dotted spelling.
+- Checked on a live portal: 140 operations in full and 4 up to the refusal a portal with inventory
+  management off gives. Not run: supplier links, which need a CRM record of the Supplier category,
+  custom field values of documents and reading one markup.
+
 ## 0.8.3 — 19.09.2026
 
 - **Bitrix24 Trigger warns that chat events do not come through it.** The Bitrix24 documentation

@@ -1,8 +1,8 @@
 # @zenland-dev/n8n-nodes-bitrix24
 
 n8n community nodes for [Bitrix24](https://www.bitrix24.com): a CRM node with 268 operations
-across 42 resources, a tasks node with 129 operations across 17 resources, a messenger node with
-63 operations, an open lines node with 43, a Drive node with 36, a chatbot node with 34, an
+across 42 resources, a catalog node with 148 operations across 26 resources, a tasks node with 129
+operations across 17 resources, a messenger node with 63 operations, an open lines node with 43, a Drive node with 36, a chatbot node with 34, an
 employees node with 32, a calendar node with 21, a lists node with 19, a business process node with
 10, a node that calls any of the ~1400 REST methods by name or in batches, a trigger for outgoing
 webhooks, and two triggers that need no public URL: one for chat messages, one for messages and
@@ -12,10 +12,10 @@ Written from scratch against the official REST documentation
 ([bitrix24/b24restdocs](https://github.com/bitrix24/b24restdocs), read on 14.09.2026). No code
 from any other package.
 
-**Status: 0.8.2.** Every operation of the CRM, Drive, chatbot, calendar and lists nodes was run
-against a live Bitrix24 portal, 29 of the 32 of the employees node, 116 of the 129 of the tasks
-node, 57 of the 63 of the messenger node, 14 of the 43 of the open lines node and 7 of the 10 of the
-business process node: reads as they are, writes on objects the test created and deleted. What was
+**Status: 0.9.0.** Every operation of the CRM, Drive, chatbot, calendar and lists nodes was run
+against a live Bitrix24 portal, 144 of the 148 of the catalog node, 29 of the 32 of the employees
+node, 116 of the 129 of the tasks node, 57 of the 63 of the messenger node, 14 of the 43 of the open
+lines node and 7 of the 10 of the business process node: reads as they are, writes on objects the test created and deleted. What was
 not run, and why, is under [What was checked](#what-was-checked). Operations that work with a
 limitation of Bitrix24 itself are listed under [Quirks](#quirks-worth-knowing).
 
@@ -32,6 +32,7 @@ limitation of Bitrix24 itself are listed under [Quirks](#quirks-worth-knowing).
 - [Bitrix24 Employees](#bitrix24-employees)
 - [Bitrix24 Business Processes](#bitrix24-business-processes)
 - [Bitrix24 Lists](#bitrix24-lists)
+- [Bitrix24 Catalog](#bitrix24-catalog)
 - [Bitrix24 Trigger](#bitrix24-trigger)
 - [Bitrix24 Messenger Trigger](#bitrix24-messenger-trigger)
 - [Bitrix24 Chatbot Trigger](#bitrix24-chatbot-trigger)
@@ -54,7 +55,7 @@ Requires n8n 2.x and Node 20.19 or newer.
 
 ## Credentials
 
-Eight of the ten nodes use **Bitrix24 Webhook API**, built from an inbound webhook. The chatbot
+Nine of the eleven nodes use **Bitrix24 Webhook API**, built from an inbound webhook. The chatbot
 node and its trigger use **Bitrix24 Chatbot Webhook API**: the same fields plus a bot token, see
 [below](#bitrix24-chatbot-webhook-api).
 
@@ -865,6 +866,98 @@ field, and Update wants the type passed again unchanged. Values of a List field 
 like `/bitrix/tools/disk/uf.php?attachedId=103&action=download`, one per value. **Field ID** here is
 the number without the `PROPERTY_` prefix: `951` for `PROPERTY_951`.
 
+## Bitrix24 Catalog
+
+The product catalog the CRM sells from: products, their variations and services, prices, sections,
+properties, units, VAT rates, stores, stock and inventory documents. 148 operations across 26
+resources: every one of the 145 working `catalog.*` methods, plus **Product Image → Download**,
+**Inventory Document → Get** and **Price → Set Product Prices**, which Bitrix24 has no single method for. The webhook needs the `catalog`
+permission, and `crm` for the currency pickers.
+
+| Resource | Operations |
+|---|---|
+| **Product, Variation, Product With Variations, Service** | Create, Get, Get Many, Update, Delete, Get Fields, Download File |
+| **Product Image** | Upload, Get, Get Many, Download, Delete, Get Fields |
+| **Price** | Create, Get, Get Many, Update, Delete, Get Fields, Set Product Prices, Replace Product Prices |
+| **Price Type, Price Type Name** | Create, Get, Get Many, Update, Delete, Get Fields (+ Get Languages) |
+| **Price Type Access** | Create, Get Many, Delete, Get Fields |
+| **Markup** | Get, Get Many, Get Fields |
+| **Rounding Rule** | Create, Get, Get Many, Update, Delete, Get Fields, Get Rounding Types |
+| **Section, Property, Property List Value** | Create, Get, Get Many, Update, Delete, Get Fields |
+| **Property Feature** | Create, Get, Get Many, Update, Get Fields, Get Available |
+| **Property Filter Setting** | Get, Get Many, Set |
+| **Unit of Measure, VAT Rate, Store** | Create, Get, Get Many, Update, Delete, Get Fields |
+| **Unit Ratio, Stock** | Get, Get Many, Get Fields |
+| **Inventory Document** | Create, Get, Get Many, Update, Delete, Delete Many, Conduct, Conduct Many, Cancel, Cancel Many, Get Fields, Get Types, Get Inventory Mode |
+| **Document Item** | Create, Get Many, Update, Delete, Get Fields |
+| **Document Supplier** | Create, Get Many, Delete, Get Fields |
+| **Document Custom Field Value** | Get Many, Update |
+| **Catalog** | Get, Get Many, Get Fields, Is Variations Catalog |
+
+### Which catalog
+
+A portal keeps its products in one catalog and, once a product has variations, the variations in
+a second one tied to it (`productIblockId` of the second names the first). **Catalog** can be left
+empty everywhere: the node takes the catalog the CRM uses, or the variations catalog tied to it.
+Bitrix24 refuses a product list without it — `Required filter fields: iblockId` — so the node always
+sends one.
+
+### Four kinds of item
+
+**Product**, **Variation**, **Product With Variations** and **Service** are four method families of
+one shape. **Product → Get Many** returns every kind that lives in the product catalog, told apart by
+`type`: 1 a simple product, 3 a product with variations, 7 a service. Variations are read with
+**Variation → Get Many**, and **Parent Product ID** narrows them to one product. A product with
+variations has no price or stock of its own; its variations do.
+
+### Fields and properties
+
+**Fields to Return** left empty reads every field and every property. The list method has no "all"
+(`select: ["*"]` answers `Required select fields: id, iblockId`), so the node first asks
+`getFieldsByFilter` for the field names — one extra call per Get Many.
+
+Property values go into **Property Values (JSON)** keyed by property ID or code:
+`{"258": "Oak", "COLOR": ["Red", "Blue"]}`. A multiple property takes an array, a list property the
+ID of its value (**Property List Value → Get Many** with `{"propertyId": 258}`). A list property
+with a single value is the exception: Bitrix24 treats it as a checkbox, reads it as `"Y"` or `"N"`
+and takes `"Y"` to set it. An empty string clears a value, an empty array a multiple one. The
+node sends every value as `{"value": …}`, the only form update takes (see
+[Quirks](#catalog)). **Property → Get
+Many** gives IDs, codes and types; the field descriptions of Get Fields type every property alike,
+so the property list is where a file property (`propertyType` F) shows. Read back, a property holds
+`{"value": …, "valueId": …}`, or an array of those.
+
+To find the product an outside system knows, filter Get Many by **External ID**: `{"xmlId": "SKU-1"}`.
+
+### Prices
+
+The selling price is not a product field: a product has one price per price type. **Set Product
+Prices** sets several at once: a price of a listed type is changed in place and keeps its ID, a
+missing one is added, and prices you do not list stay unless **Remove Other Prices** is on. It
+reads the current prices and makes one call per price. **Replace Product Prices** does it in one
+call through `catalog.price.modify`: the product ends up with exactly the prices listed, and every
+one of them gets a new ID. **Purchasing Price** is a product field, the price the item costs to buy in.
+
+A new price type comes with view and buy access for the default customer groups, so **Price Type
+Access → Create** for one of them answers "The specified access type for this group already exists".
+
+### Files and pictures
+
+**Download File** fetches a picture or a file property of an item. **Product Image → Download**
+fetches one image by the public link Bitrix24 gives it. **Upload** adds an image from binary data;
+without a type it goes to the gallery (`MORE_PHOTO`).
+
+### Stock and inventory documents
+
+**Stock → Get Many** tells what every store holds and how much is reserved, e.g. of one product
+with `{"productId": 101}`. The API does not write stock directly. With inventory management off
+(**Inventory Document → Get Inventory Mode** answers `false`), the product's **Quantity** field is
+the stock. With it on, stock moves only through inventory documents: **Create** a document,
+add products with **Document Item → Create**, then **Conduct**. **Cancel** takes a conducted
+document back. `status` of a document is N for a draft, Y once conducted, C when cancelled. With
+inventory management off, documents and their items can be created, changed and deleted, but
+Conduct and Cancel answer "Inventory management has to be enabled to process inventory objects".
+
 ## Bitrix24 Trigger
 
 Starts a workflow when Bitrix24 posts an outgoing webhook.
@@ -878,9 +971,9 @@ It has to be done by hand. The method that would subscribe the URL automatically
 answers `WRONG_AUTH_TYPE` to inbound webhooks: only an installed application may call it.
 
 Requests without the right application token get `403` and never start the workflow, and the
-token is removed from the output. The **Events** list has 181 event codes from the
-documentation; codes it lacks go into **Other Event Codes**. Events not selected are answered
-`OK` and dropped.
+token is removed from the output. The **Events** list has 196 event codes from the
+documentation, the catalog's `CATALOG.PRODUCT.ON.ADD` and the like among them; codes it lacks go
+into **Other Event Codes**. Events not selected are answered `OK` and dropped.
 
 The five chat events `ONIMV2…` are in the list, but an outgoing webhook never delivers them:
 Bitrix24 keeps them in the event queue of the user who subscribed, and they are read from there
@@ -1120,6 +1213,36 @@ through is over before the next request arrives, and Terminate and Delete then a
 process is not found" rather than a success. Both were checked on a process waiting for a decision:
 there they answer `true` and the process leaves Get Instances at once.
 
+### Catalog
+
+**File fields are named the way the links spell them.** `catalog.product.download` and its variation,
+parent and service twins take `detailPicture`, `previewPicture` or `property258` in `fieldName`.
+The documented `DETAIL_PICTURE` and `PROPERTY_258`, and a property code, answer "Name file field is
+not available". **Download File** sends the working form whichever way the field is given.
+
+**The download link of a product image does not work through a webhook.** `catalog.productImage.get`
+hands out `downloadUrl` as `/rest/<user>/<webhook code>/download/?token=…`: it carries the webhook
+secret, and fetching it answers `ERROR_METHOD_NOT_FOUND`. The node keeps it out of every output and
+downloads from `detailUrl`, the public link of the same file.
+
+**A list wants its keys.** Product, variation and service lists answer `Required select fields: id,
+iblockId` without both in the field list, and `Required filter fields: iblockId` without the catalog
+in the filter; `catalog.section.list` wants the catalog too. The node adds all three.
+
+**A property value on update must be wrapped.** `catalog.product.update` takes `{"property258":
+{"value": "Oak"}}`. Given a bare `"Oak"`, a text property keeps its old value and a number
+property is cleared, and the call still answers success. Add takes both forms; the node always
+wraps.
+
+**`catalog.price.modify` refuses existing prices.** Any price that names its ID — as a number, as
+a string, with every field of its row — answers "Validate price error. Catalog price group is
+wrong", although the documentation shows exactly that. Without IDs the method replaces the whole
+set. That is why **Set Product Prices** goes price by price and **Replace Product Prices** says what
+it does.
+
+**A VAT rate wants its name on every update.** `catalog.vat.update` without `name` answers
+"Required fields: name", even when only the rate changes.
+
 ## What was checked
 
 Against a live Bitrix24 portal, 14.09.2026, through a harness that runs the compiled nodes with
@@ -1302,6 +1425,24 @@ receives.
 | Read, checked | 3 |
 | Not checked: a second person, and an application's event token | 3 |
 
+The catalog node was checked on 19.09.2026 on a section, two properties with list values, a price
+type, a unit, a VAT rate, a store, products of all four kinds, prices, images and inventory
+documents the run created, inactive where the object allows it, and deleted at the end. Every
+write was read back: property values by ID and by code, prices by type with their IDs, the
+uploaded pictures downloaded again. Inventory management was off and stayed off, so conducting
+and cancelling a document were checked only as far as the refusal.
+
+| Bitrix24 Catalog | Operations |
+|---|---|
+| Write, checked | 59 |
+| Read, checked | 81 |
+| Works up to a Bitrix24 refusal: inventory management off | 4 |
+| Not checked | 4 |
+
+Not checked: linking a supplier to a receipt and removing the link, which need a CRM company or
+contact of the Supplier category; setting a custom field of a document, which needs such a field;
+and reading one markup, as the API cannot create a markup and there was none.
+
 The trigger was fed hand-made deliveries (10 checks, including a wrong token and `__proto__`
 keys) and fetched a deal. A delivery from Bitrix24 itself needs an n8n with a public
 address. Offline, every operation runs with sample parameters, and every method the nodes call
@@ -1309,8 +1450,8 @@ exists in the documentation.
 
 ## What is not here yet
 
-- Nodes for telephony, the store and catalog, sites, booking, mail, the activity stream and BI.
-  Until then, the Bitrix24 node calls their methods directly.
+- Nodes for telephony, the online store (orders, payments, deliveries), sites, booking, mail, the
+  activity stream and BI. Until then, the Bitrix24 node calls their methods directly.
 - In the business process node: automation rules, actions and templates cannot be created,
   changed or even listed — `bizproc.robot.*`, `bizproc.activity.*` except the log, and
   `bizproc.workflow.template.add/update/delete` all answer `ACCESS_DENIED Application context

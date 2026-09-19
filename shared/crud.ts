@@ -47,6 +47,14 @@ export interface CrudConfig {
 	minId?: number;
 	/** Name of the parameter the fields go in — userfieldconfig takes `field`, most take `fields`. */
 	fieldsKey?: string;
+	/** Where the field descriptions sit inside `result` of Get Fields: catalog.vat.getFields answers {vat: {…}}. */
+	fieldsResultKey?: string;
+	/** Fields every Create sends under the typed ones, e.g. the catalog a section belongs to. */
+	baseFields?: (ctx: IExecuteFunctions, itemIndex: number) => Promise<IDataObject>;
+	/** Whether Update sends baseFields too: catalog.section.update wants iblockId again. */
+	baseFieldsOnUpdate?: boolean;
+	/** Filter every Get Many sends under the typed one, for methods that refuse a list without it. */
+	baseFilter?: (ctx: IExecuteFunctions, itemIndex: number) => Promise<IDataObject>;
 	descriptions?: Partial<Record<CrudKind, string>>;
 }
 
@@ -129,7 +137,8 @@ export function crudOperations(config: CrudConfig): Operation[] {
 				description: config.descriptions?.create ?? `Create a ${config.noun}`,
 				properties: [...context, fieldsProperty],
 				async execute(itemIndex) {
-					const fields = jsonParameter<IDataObject>(this, 'fieldsJson', itemIndex, {});
+					const typed = jsonParameter<IDataObject>(this, 'fieldsJson', itemIndex, {});
+					const fields = config.baseFields === undefined ? typed : { ...(await config.baseFields(this, itemIndex)), ...typed };
 					const body = await bitrix24Request.call(this, methodOf(this, itemIndex, 'create'), { ...contextOf(this, itemIndex), [fieldsKey]: fields }, { itemIndex });
 					const result = body.result;
 					if (typeof result === 'number' || typeof result === 'string') return { id: result };
@@ -191,7 +200,8 @@ export function crudOperations(config: CrudConfig): Operation[] {
 					const limit = returnAll ? undefined : (this.getNodeParameter('limit', itemIndex) as number);
 					const params: IDataObject = { ...contextOf(this, itemIndex) };
 					if (listParams.includes('filter')) {
-						const filter = jsonParameter<IDataObject>(this, 'filterJson', itemIndex, {});
+						const typed = jsonParameter<IDataObject>(this, 'filterJson', itemIndex, {});
+						const filter = config.baseFilter === undefined ? typed : { ...(await config.baseFilter(this, itemIndex)), ...typed };
 						if (Object.keys(filter).length > 0) params.filter = filter;
 					}
 					if (listParams.includes('order')) {
@@ -219,7 +229,8 @@ export function crudOperations(config: CrudConfig): Operation[] {
 				description: config.descriptions?.update ?? `Change fields of a ${config.noun}; fields not given stay as they are`,
 				properties: [...context, idProperty, fieldsProperty],
 				async execute(itemIndex) {
-					const fields = jsonParameter<IDataObject>(this, 'fieldsJson', itemIndex, {});
+					const typed = jsonParameter<IDataObject>(this, 'fieldsJson', itemIndex, {});
+					const fields = config.baseFields === undefined || config.baseFieldsOnUpdate !== true ? typed : { ...(await config.baseFields(this, itemIndex)), ...typed };
 					const body = await bitrix24Request.call(
 						this,
 						methodOf(this, itemIndex, 'update'),
@@ -255,7 +266,9 @@ export function crudOperations(config: CrudConfig): Operation[] {
 				properties: [...context],
 				async execute(itemIndex) {
 					const body = await bitrix24Request.call(this, methodOf(this, itemIndex, 'getFields'), contextOf(this, itemIndex), { itemIndex });
-					const result = (body.result ?? {}) as IDataObject;
+					let result = (body.result ?? {}) as IDataObject;
+					const wrapped = config.fieldsResultKey === undefined ? undefined : result[config.fieldsResultKey];
+					if (wrapped !== null && typeof wrapped === 'object') result = wrapped as IDataObject;
 					const fields = (result.fields !== null && typeof result.fields === 'object' ? result.fields : result) as IDataObject;
 					return Object.entries(fields).map(([name, meta]) =>
 						meta !== null && typeof meta === 'object' ? { name, ...(meta as IDataObject) } : { name, value: meta as string },
