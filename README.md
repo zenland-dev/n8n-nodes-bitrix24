@@ -882,6 +882,11 @@ token is removed from the output. The **Events** list has 181 event codes from t
 documentation; codes it lacks go into **Other Event Codes**. Events not selected are answered
 `OK` and dropped.
 
+The five chat events `ONIMV2…` are in the list, but an outgoing webhook never delivers them:
+Bitrix24 keeps them in the event queue of the user who subscribed, and they are read from there
+by the [Bitrix24 Messenger Trigger](#bitrix24-messenger-trigger). The list says so under each of
+them.
+
 Bitrix24 sends only IDs, for example `data.FIELDS.ID` on `ONCRMDEALUPDATE`. **Fetch the Changed
 CRM Record** reads the whole lead, deal, contact, company, quote or smart process item after an
 add or update event and puts it under `record`. If that read fails, the workflow still starts,

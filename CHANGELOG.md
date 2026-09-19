@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.3 — 19.09.2026
+
+- **Bitrix24 Trigger warns that chat events do not come through it.** The Bitrix24 documentation
+  now says outright that `ONIMV2JOINCHAT`, `ONIMV2MESSAGEADD`, `ONIMV2MESSAGEDELETE`,
+  `ONIMV2MESSAGEUPDATE` and `ONIMV2REACTIONCHANGE` never call a handler: they wait in the event
+  queue of the user who subscribed and are read with `im.v2.Event.get`. A workflow with one of them
+  selected in Bitrix24 Trigger never starts. The five stay in the list, so a workflow that has them
+  keeps a valid value, and each now says to use Bitrix24 Messenger Trigger, which reads that queue.
+
 ## 0.8.2 — 18.09.2026
 
 The first published version of the two new nodes: 0.8.0 and 0.8.1 below were written and tested but

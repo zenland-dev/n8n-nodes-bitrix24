@@ -1,6 +1,6 @@
 {
 	"name": "@zenland-dev/n8n-nodes-bitrix24",
-	"version": "0.8.2",
+	"version": "0.8.3",
 	"description": "Bitrix24 nodes for n8n: CRM, tasks and workgroups, business processes, universal lists, calendar and resource booking, employees and company structure, messenger and open lines, chatbots, Drive files and folders, any REST method, batches, a webhook trigger and polling triggers for chats and bots",
 	"keywords": [
 		"n8n-community-node-package",
