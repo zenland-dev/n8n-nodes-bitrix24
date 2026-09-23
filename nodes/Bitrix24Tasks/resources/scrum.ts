@@ -2,6 +2,7 @@ import type { IDataObject, IExecuteFunctions, INodeProperties } from 'n8n-workfl
 
 import { listAll } from '../../../shared/list';
 import { jsonParameter, returnAllProperties, stringList } from '../../../shared/params';
+import { webhookUserId } from '../../../shared/profile';
 import { numberProperty, positiveInt, rows } from '../../../shared/props';
 import type { Operation, Resource } from '../../../shared/spec';
 import { bitrix24Request } from '../../../shared/transport';
@@ -40,7 +41,9 @@ const SPRINT_STATUSES = [
 
 function sprintOptions(forUpdate: boolean): INodeProperties[] {
 	const options: INodeProperties[] = [{ displayName: 'Sort', name: 'sort', type: 'number', default: 0 }];
-	if (forUpdate) {
+	if (!forUpdate) {
+		options.push({ displayName: 'Created By User ID', name: 'createdBy', type: 'number', default: 0, hint: 'Leave 0 for the user the webhook acts as' });
+	} else {
 		options.push(
 			{ displayName: 'End', name: 'dateEnd', type: 'dateTime', default: '' },
 			{ displayName: 'Name', name: 'name', type: 'string', default: '' },
@@ -58,6 +61,7 @@ function sprintFields(o: IDataObject): IDataObject {
 	if (o.dateEnd) fields.dateEnd = o.dateEnd as string;
 	if (o.sort !== undefined) fields.sort = Number(o.sort) || 0;
 	if (o.status !== undefined) fields.status = o.status as string;
+	if (optionalInt(o.createdBy) !== undefined) fields.createdBy = Number(o.createdBy);
 	return fields;
 }
 
@@ -88,7 +92,10 @@ export const sprintResource: Resource = {
 					dateEnd: this.getNodeParameter('dateEnd', itemIndex) as string,
 					status: this.getNodeParameter('status', itemIndex) as string,
 				};
-				const fields = { groupId: positiveInt(this, 'groupId', itemIndex, 'Scrum'), name: this.getNodeParameter('name', itemIndex) as string, ...sprintFields(o) };
+				const fields: IDataObject = { groupId: positiveInt(this, 'groupId', itemIndex, 'Scrum'), name: this.getNodeParameter('name', itemIndex) as string, ...sprintFields(o) };
+				// Without createdBy Bitrix24 answers "Unable to add sprint" and names nothing (live portal,
+				// 23.09.2026); the documentation has it only in its examples.
+				fields.createdBy ??= await webhookUserId(this, itemIndex);
 				const body = await bitrix24Request.call(this, 'tasks.api.scrum.sprint.add', { fields }, { itemIndex });
 				return rows(body.result);
 			},
@@ -100,7 +107,7 @@ export const sprintResource: Resource = {
 			description: 'Retrieve one sprint',
 			properties: [sprintId],
 			async execute(itemIndex) {
-				const body = await bitrix24Request.call(this, 'tasks.api.scrum.sprint.get', { sprintId: positiveInt(this, 'sprintId', itemIndex, 'Sprint ID') }, { itemIndex });
+				const body = await bitrix24Request.call(this, 'tasks.api.scrum.sprint.get', { id: positiveInt(this, 'sprintId', itemIndex, 'Sprint ID') }, { itemIndex });
 				return rows(body.result);
 			},
 		},
@@ -511,9 +518,9 @@ export const scrumTaskResource: Resource = {
 					placeholder: 'Add Field',
 					default: {},
 					options: [
-						{ displayName: 'Backlog or Sprint ID', name: 'entityId', type: 'number', default: 0, description: 'Where the task goes. Required when the task is not in the scrum yet; leave out to keep a scrum task where it is.' },
+						{ displayName: 'Backlog or Sprint ID', name: 'entityId', type: 'number', default: 0, description: 'Where the task goes. Leave out to keep it where it is. A task created in the scrum group is already in its backlog; a task from outside the scrum is refused, with a backlog ID or without.' },
 						{ displayName: 'Epic ID', name: 'epicId', type: 'number', default: 0, description: '0 removes the epic' },
-						{ displayName: 'Sort', name: 'sort', type: 'number', default: 0 },
+						{ displayName: 'Sort', name: 'sort', type: 'number', default: 0, description: 'Position in the backlog or sprint. Bitrix24 sets its fractional order, sortFloat, to the same number.' },
 						{ displayName: 'Story Points', name: 'storyPoints', type: 'string', default: '', placeholder: '5' },
 					],
 				},

@@ -13,10 +13,9 @@ Written from scratch against the official REST documentation
 ([bitrix24/b24restdocs](https://github.com/bitrix24/b24restdocs), read on 14.09.2026). No code
 from any other package.
 
-**Status: 0.10.0.** Every operation of the CRM, Drive, chatbot, calendar, lists and event log nodes
-was run against a live Bitrix24 portal, 140 of the 148 of the catalog node, 29 of the 32 of the
-employees node, 116 of the 129 of the tasks node, 57 of the 63 of the messenger node, 14 of the 43 of
-the open lines node, 7 of the 10 of the business process node, 2 of the 3 of the consents node and
+**Status: 0.10.1.** Every operation of the CRM, tasks, Drive, chatbot, calendar, lists and event log
+nodes was run against a live Bitrix24 portal, 140 of the 148 of the catalog node, 29 of the 32 of the
+employees node, 57 of the 63 of the messenger node, 14 of the 43 of the open lines node, 7 of the 10 of the business process node, 2 of the 3 of the consents node and
 1 of the 3 of the AI node: reads as they are, writes on objects the test created and deleted. What was
 not run, and why, is under [What was checked](#what-was-checked). Operations that work with a
 limitation of Bitrix24 itself are listed under [Quirks](#quirks-worth-knowing).
@@ -1200,9 +1199,17 @@ Tasks and workgroups:
 - Flow → Update resets settings the request leaves out: the flow's template went back to 0.
   Toggle Pin answers the new state, `pinned: true` or `false`.
 - A sprint needs start, end and status (`Incorrect dateStart format`, `Incorrect sprint status`
-  otherwise), and a real scrum. A group created through the API can come out as a collab with the
-  scrum master dropped, and sprints cannot be created on it (`Unable to add sprint`). Epics and
-  backlogs work on such a group anyway.
+  otherwise) and the user who creates it: without `createdBy` Bitrix24 answers `Unable to add
+  sprint` and names no reason. The documentation shows the field in its examples only. Sprint →
+  Create fills in the user the webhook acts as unless **Created By User ID** says otherwise.
+- `tasks.api.scrum.sprint.get` takes `id`, not the `sprintId` its documentation lists.
+- A task created in a scrum group lands in the scrum backlog by itself. A task from outside the scrum
+  cannot be brought in by Scrum Task → Update: without a backlog or sprint Bitrix24 answers `Entity id
+  not found`, and with the backlog of the scrum `ERROR_EMPTY_ENTITY_ID`.
+- Sort on a scrum task sets the fractional order `sortFloat` to the same number; a `sortFloat` of
+  2.5 turns `sort` into 3.
+- A group created through the API can come out as a collab with the scrum master dropped. Make a
+  scrum in Bitrix24 itself; epics and backlogs work on a collab anyway.
 - The ID of a message in the task chat is not in the task history; a result from a chat message
   needs the ID from Bitrix24 Messenger → Message → Get Many or from `MESSAGE_ID` of the Task
   Comment Added trigger event.
@@ -1390,10 +1397,16 @@ My Plan stages and files the run created and deleted at the end.
 
 | Bitrix24 Tasks | Operations |
 |---|---|
-| Write, checked | 64 |
-| Read, checked | 36 |
-| Works, with a Bitrix24 limitation | 16 |
-| Not checked: a scrum could not be created through the API | 13 |
+| Write, checked | 73 |
+| Read, checked | 38 |
+| Works, with a Bitrix24 limitation | 18 |
+| Not checked | 0 |
+
+The scrum operations waited until 23.09.2026 for a scrum: the API makes a collab instead. They ran in
+a hidden scrum made in the Bitrix24 interface, with the webhook user alone in it, on sprints, a
+kanban stage, an epic and tasks the run created and deleted. That run found two bugs, fixed in
+0.10.1: Sprint → Create never worked, as Bitrix24 refuses a sprint without its author, and Sprint →
+Get sent the parameter name from the documentation, which the method does not know.
 
 Those runs changed the node before this version: Request to Join refuses a member (Bitrix24
 takes the member out instead), Remove refuses a group owner, Sprint → Create requires start, end

@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.10.1 — 23.09.2026
+
+- **Tasks → Scrum Sprint → Create works.** It never did: Bitrix24 refuses a sprint without the user
+  who creates it, answering `Unable to add sprint` with no reason, and the documentation shows
+  `createdBy` in its examples only. The node now sends the user the webhook acts as, or the one in
+  the new **Created By User ID**.
+- **Tasks → Scrum Sprint → Get works.** It sent `sprintId`, the name the documentation lists, and
+  Bitrix24 answered `Could not find value for parameter {id}`. It sends `id` now.
+- **Scrum Task → Update, corrected hint.** 0.10.0 said a task not yet in the scrum needs Backlog or
+  Sprint ID. On a live scrum a task created in the scrum group is in its backlog from the start, and a
+  task from outside the scrum is refused whether a backlog is given (`ERROR_EMPTY_ENTITY_ID`) or not
+  (`Entity id not found`). Sort now says that Bitrix24 copies it into the fractional `sortFloat`.
+- All 129 operations of the tasks node have now run against a live portal. The 14 scrum ones had
+  waited for a scrum, which the API cannot make.
+
 ## 0.10.0 — 22.09.2026
 
 - **New node: Bitrix24 Event Log.** 5 operations in 2 resources, one for each documented

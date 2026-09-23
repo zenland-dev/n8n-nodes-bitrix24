@@ -1,10 +1,9 @@
 import type { IDataObject, IExecuteFunctions, ILoadOptionsFunctions, INodeProperties } from 'n8n-workflow';
 import { NodeOperationError } from 'n8n-workflow';
 
-import { cached, CONFIG_TTL_MS } from '../../../shared/cache';
 import { instantOf, isTimeZone, wallDate, wallDateTime, wallParts } from '../../../shared/datetime';
 import { compact, stringList } from '../../../shared/params';
-import { bitrix24Request, portalKey } from '../../../shared/transport';
+import { webhookUserId } from '../../../shared/profile';
 import { idList } from '../../../shared/values';
 
 export type CalendarContext = IExecuteFunctions | ILoadOptionsFunctions;
@@ -39,25 +38,7 @@ export const ownerIdProperty: INodeProperties = {
 	hint: 'Leave 0 for the user the webhook acts as',
 };
 
-/** The ID of the user the webhook acts as, memoised per portal. */
-export async function webhookUserId(ctx: CalendarContext, itemIndex?: number): Promise<number> {
-	const portal = await portalKey.call(ctx);
-	return await cached(
-		`calendar:profile:${portal}`,
-		async () => {
-			const body = await bitrix24Request.call(ctx, 'profile', {}, { itemIndex });
-			const id = Number((body.result as IDataObject | null)?.ID ?? 0);
-			if (!Number.isInteger(id) || id <= 0) {
-				throw new NodeOperationError(ctx.getNode(), 'Bitrix24 did not say which user the webhook acts as', {
-					itemIndex,
-					description: 'The profile method answered without an ID. Check that the webhook is still valid.',
-				});
-			}
-			return id;
-		},
-		CONFIG_TTL_MS,
-	);
-}
+export { webhookUserId };
 
 /**
  * `type` and `ownerId` as the calendar methods want them.
