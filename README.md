@@ -4,7 +4,8 @@ n8n community nodes for [Bitrix24](https://www.bitrix24.com): a CRM node with 26
 across 42 resources, a catalog node with 148 operations across 26 resources, a tasks node with 129
 operations across 17 resources, a messenger node with 63 operations, an open lines node with 43, a Drive node with 36, a chatbot node with 34, an
 employees node with 32, a calendar node with 21, a lists node with 19, a business process node with
-10, a node that calls any of the ~1400 REST methods by name or in batches, a trigger for outgoing
+10, an event log node with 5, a consents node with 3 and an AI node with 3, a node that calls any of
+the ~1400 REST methods by name or in batches, a trigger for outgoing
 webhooks, and two triggers that need no public URL: one for chat messages, one for messages and
 commands sent to a bot.
 
@@ -12,10 +13,11 @@ Written from scratch against the official REST documentation
 ([bitrix24/b24restdocs](https://github.com/bitrix24/b24restdocs), read on 14.09.2026). No code
 from any other package.
 
-**Status: 0.9.0.** Every operation of the CRM, Drive, chatbot, calendar and lists nodes was run
-against a live Bitrix24 portal, 144 of the 148 of the catalog node, 29 of the 32 of the employees
-node, 116 of the 129 of the tasks node, 57 of the 63 of the messenger node, 14 of the 43 of the open
-lines node and 7 of the 10 of the business process node: reads as they are, writes on objects the test created and deleted. What was
+**Status: 0.10.0.** Every operation of the CRM, Drive, chatbot, calendar, lists and event log nodes
+was run against a live Bitrix24 portal, 140 of the 148 of the catalog node, 29 of the 32 of the
+employees node, 116 of the 129 of the tasks node, 57 of the 63 of the messenger node, 14 of the 43 of
+the open lines node, 7 of the 10 of the business process node, 2 of the 3 of the consents node and
+1 of the 3 of the AI node: reads as they are, writes on objects the test created and deleted. What was
 not run, and why, is under [What was checked](#what-was-checked). Operations that work with a
 limitation of Bitrix24 itself are listed under [Quirks](#quirks-worth-knowing).
 
@@ -33,6 +35,9 @@ limitation of Bitrix24 itself are listed under [Quirks](#quirks-worth-knowing).
 - [Bitrix24 Business Processes](#bitrix24-business-processes)
 - [Bitrix24 Lists](#bitrix24-lists)
 - [Bitrix24 Catalog](#bitrix24-catalog)
+- [Bitrix24 Event Log](#bitrix24-event-log)
+- [Bitrix24 Consents](#bitrix24-consents)
+- [Bitrix24 AI](#bitrix24-ai)
 - [Bitrix24 Trigger](#bitrix24-trigger)
 - [Bitrix24 Messenger Trigger](#bitrix24-messenger-trigger)
 - [Bitrix24 Chatbot Trigger](#bitrix24-chatbot-trigger)
@@ -958,6 +963,97 @@ document back. `status` of a document is N for a draft, Y once conducted, C when
 inventory management off, documents and their items can be created, changed and deleted, but
 Conduct and Cancel answer "Inventory management has to be enabled to process inventory objects".
 
+## Bitrix24 Event Log
+
+What the portal wrote down about itself: sign-ins, password changes and the other actions the event
+log keeps. Read-only — Bitrix24 has no method that adds an entry. The webhook needs the `main`
+permission and an administrator behind it; for anyone else every method here answers `Access denied`.
+
+| Resource | Operations |
+|---|---|
+| **Entry** | Get Many, Get, Get New |
+| **Field** | Get Many, Get |
+
+The five methods belong to REST 3.0, which the node addresses and unwraps for you. What shows
+through is the error format: it names the field it refused and why.
+
+### Only five fields can be filtered
+
+`id`, `timestampX`, `auditTypeId`, `userId`, `guestId`. A condition on any of the other eight —
+`severity`, `moduleId`, `itemId`, `remoteAddr`, `userAgent`, `requestUri`, `siteId`, `description` —
+is not ignored but fails the whole call: `severity: DTO "EventLogDto" in field "severity" requires
+attribute "Filterable" to perform this request`. The same five are the ones that sort, and **Field →
+Get Many** says so per field in `filterable` and `sortable`.
+
+**Filter** builds the usual conditions: a period, an event type such as `USER_AUTHORIZE`, a user.
+**Extra Conditions (JSON)** takes the REST 3.0 form as it is — an array of `["field", "operator",
+value]` triples, e.g. `[["timestampX", ">=", "2026-09-01T00:00:00+03:00"]]`.
+
+Dates go in as ISO 8601 down to the second. Milliseconds are refused, and a date built in
+JavaScript carries them, so the node cuts them off before the call.
+
+### Get Many reads a period, Get New polls
+
+**Get Many** is the report: a period, a sort order, and paging done for you up to Limit or to
+everything. **Get New** is the poll — it takes the ID the previous run stopped at and answers what
+appeared after it, so a schedule reads every entry once and none of them twice. The ID grows with
+every entry and never repeats; a time can be the cursor instead when the order of writing matters
+less than the order of events.
+
+## Bitrix24 Consents
+
+The agreements a portal keeps and the consents people give to them: personal data, newsletters,
+terms of use. The webhook needs the `userconsent` permission, and any user may call these methods.
+
+| Resource | Operations |
+|---|---|
+| **Agreement** | Get Many, Get Text |
+| **Consent** | Create |
+
+Agreements themselves are written and edited in the Bitrix24 interface — the API has no Create or
+Update for them, only the three methods above.
+
+### Collecting a consent takes three steps
+
+1. **Agreement → Get Many** finds the agreement by name and tells whether it is switched on:
+   `ACTIVE` is `N` for a disabled one, and a disabled agreement should not be shown.
+2. **Agreement → Get Text** returns `TEXT` to display and `LABEL` for the button.
+3. **Consent → Create** stores the answer against the agreement ID and the IP address it came from.
+   It answers the ID of the record.
+
+The form is yours. Bitrix24 hands out the wording and keeps the record; it displays nothing and
+asks no one. **IP Address** is required — Bitrix24 stores whatever it is given and does not check it.
+
+**Substitutions** fill a standard agreement, the kind made from a Bitrix24 template: the company
+name and address, the purpose, the third parties, an e-mail, the button caption. An agreement
+written by hand holds arbitrary HTML and ignores them.
+
+A consent, once written, stays: no REST method deletes one.
+
+## Bitrix24 AI
+
+The AI services a portal sends prompts to. This node connects a service of your own and lists what
+is connected; it runs no prompt. Bitrix24 calls the service itself, when a person uses AI in a CRM
+card, a chat or an automation rule. The webhook needs the `ai_admin` permission and an
+administrator behind it.
+
+| Resource | Operations |
+|---|---|
+| **Service** | Get Many, Register, Unregister |
+
+**Register** takes a code, a category — `text`, `image`, `audio` or `call` — and the address of an
+endpoint you host. Bitrix24 checks that address before it saves anything: it has to answer `200`.
+Afterwards Bitrix24 posts prompts to it with a `callbackUrl` and an `errorCallbackUrl`, and expects
+an answer within five seconds — `200` with the result, or `202` and the result posted to the
+callback later. The link has a lifetime, in `ttl`, after which the person sees nothing. An `image`
+service has to work that asynchronous way.
+
+**Settings** carries what the service code reads: the model alias shown next to it, whether context
+is counted in tokens or symbols, and the context limit.
+
+**Unregister** removes a service by its code and answers `false`, not an error, when there was
+nothing to remove.
+
 ## Bitrix24 Trigger
 
 Starts a workflow when Bitrix24 posts an outgoing webhook.
@@ -1067,7 +1163,9 @@ per integration keeps one runaway workflow from blocking the others.
   deleted once a deal was made from it, even a deleted deal: `Connected recurring deal exists`.
   Deleting the template deal removes the setting with it.
 - `crm.item.delivery.list` returned nothing for a shipment added through `sale.shipment.add`,
-  while Get by ID read it.
+  while Get by ID read it. The documentation has since explained it: the list leaves out system
+  shipments and shipments without a delivery service, Get by ID does not. Only deals and invoices
+  have deliveries; for any other type the list is empty.
 - A payment updates only `paySystemId` and `paid`; anything else answers `Empty fields`.
 - A digital workplace created with `typeIds` came back with none attached.
 - A pipeline without its own card layout returns `null`: the built-in layout is not readable.
@@ -1242,6 +1340,27 @@ it does.
 
 **A VAT rate wants its name on every update.** `catalog.vat.update` without `name` answers
 "Required fields: name", even when only the rate changes.
+
+### Event log, consents and AI
+
+**A filter on the wrong field of the event log fails the call.** Only `id`, `timestampX`,
+`auditTypeId`, `userId` and `guestId` are filterable and sortable; a condition on `severity` or on
+any of the other seven answers `DTO "EventLogDto" in field "severity" requires attribute
+"Filterable" to perform this request`. Nothing is silently dropped, which is the pleasant half of it.
+
+**The event log refuses milliseconds.** `2026-09-01T00:00:00Z` and `2026-09-01T00:00:00+03:00` are
+taken, `2026-09-01T00:00:00.000Z` is not, and neither is a bare date. The node cuts the
+milliseconds a JavaScript date carries; an expression that builds the string itself should do the same.
+
+**Substitutions only reach a standard agreement.** `userconsent.agreement.text` fills the company
+name, the purpose and the button caption into an agreement made from a Bitrix24 template. An
+agreement written by hand is arbitrary HTML, and the `replace` values are ignored without a word.
+
+**A consent cannot be unwritten.** `userconsent.consent.add` has no counterpart: the record stays.
+
+**Application storage and message providers refuse a webhook.** Every method of `entity.*` (17) and
+`messageservice.*` (5) answers `ACCESS_DENIED Access denied! Application context required`, so
+neither has a node here. They wait for the OAuth2 credential of a local application.
 
 ## What was checked
 
@@ -1425,23 +1544,36 @@ receives.
 | Read, checked | 3 |
 | Not checked: a second person, and an application's event token | 3 |
 
-The catalog node was checked on 19.09.2026 on a section, two properties with list values, a price
-type, a unit, a VAT rate, a store, products of all four kinds, prices, images and inventory
-documents the run created, inactive where the object allows it, and deleted at the end. Every
-write was read back: property values by ID and by code, prices by type with their IDs, the
-uploaded pictures downloaded again. Inventory management was off and stayed off, so conducting
-and cancelling a document were checked only as far as the refusal.
+The catalog node was checked against a live portal on 19.09.2026: reads as they are, writes on
+objects the run created and deleted, every write read back.
 
 | Bitrix24 Catalog | Operations |
 |---|---|
 | Write, checked | 59 |
 | Read, checked | 81 |
-| Works up to a Bitrix24 refusal: inventory management off | 4 |
+| Not run through: conducting and cancelling documents, which move stock | 4 |
 | Not checked | 4 |
 
 Not checked: linking a supplier to a receipt and removing the link, which need a CRM company or
 contact of the Supplier category; setting a custom field of a document, which needs such a field;
-and reading one markup, as the API cannot create a markup and there was none.
+and reading one markup: the API cannot create one to read.
+
+The event log, consents and AI nodes were checked on 22.09.2026. Every operation of the event log
+node ran — it has no write to run — against the log of a live portal: the field list, a period, the
+cursor of Get New, paging over a page boundary, and the refusal a filter on `severity` gets. The
+consents node read the agreements and the text of one. The AI node listed the services registered
+on the portal, with and without a filter.
+
+| Bitrix24 Event Log, Consents, AI | Operations |
+|---|---|
+| Read, checked | 8 |
+| Not checked: a consent no method can delete, and a service that needs an endpoint of your own | 3 |
+
+Not checked, and why: **Consent → Create** writes a record REST cannot remove; **Service →
+Register** needs an endpoint that answers 200 to Bitrix24 and would offer the service to everyone
+on the portal; **Service → Unregister** had nothing to remove. Substitutions in **Agreement → Get
+Text** were not seen filled in either: that takes an agreement made from a Bitrix24 template, and a
+hand-written one ignores them.
 
 The trigger was fed hand-made deliveries (10 checks, including a wrong token and `__proto__`
 keys) and fetched a deal. A delivery from Bitrix24 itself needs an n8n with a public
@@ -1473,8 +1605,12 @@ exists in the documentation.
   (see [Fields come from the portal](#fields-come-from-the-portal)).
 - In the tasks node: legacy task comments (`task.commentitem.*`, gone from the new task card) and a
   trigger read of the changed task like the one the trigger does for CRM records.
+- Application data storage (`entity.*`, 17 methods) and SMS and message providers
+  (`messageservice.*`, 5). Both sections answer `ACCESS_DENIED Application context required` to
+  a webhook, all of them, so there is nothing a webhook credential could do with them.
 - An OAuth2 credential for a local application, and with it everything Bitrix24 reserves for
-  applications: `event.bind`, custom automation robots, placements, open-channel connectors.
+  applications: `event.bind`, custom automation robots, placements, open-channel connectors,
+  and the two sections above.
 - Timeline layout blocks, icons and logos, configurable activities and activity badges, which
   only make sense inside an application.
 

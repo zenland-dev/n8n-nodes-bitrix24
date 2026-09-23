@@ -22,7 +22,9 @@ function toOptions(groups: IDataObject[]): INodePropertyOptions[] {
 			const id = Number(g.id ?? g.ID);
 			const name = String(g.name ?? g.NAME ?? id);
 			const type = TYPE_LABELS[String(g.type ?? g.TYPE ?? '').toLowerCase()] ?? 'Group';
-			const archived = String(g.closed ?? g.CLOSED ?? 'N') === 'Y';
+			// The documentation types the flag as boolean; the portal still answers Y or N.
+			const closed = g.closed ?? g.CLOSED;
+			const archived = closed === true || closed === 'Y';
 			return { name: archived ? `${name} (archived)` : name, value: id, description: `${type} ${id}` };
 		})
 		.sort((a, b) => a.name.localeCompare(b.name));

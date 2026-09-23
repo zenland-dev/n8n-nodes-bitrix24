@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.10.0 — 22.09.2026
+
+- **New node: Bitrix24 Event Log.** 5 operations in 2 resources, one for each documented
+  `main.eventlog.*` method: entries for a period or an event type, one entry by ID, the entries that
+  appeared after a cursor, and the field descriptions. The methods belong to REST 3.0; the node
+  addresses and unwraps them. The webhook needs the `main` permission and an administrator behind it.
+- **New node: Bitrix24 Consents.** 3 operations: the agreements of the portal, the text of one with
+  the company details filled in, and the record of a consent given to it. Agreements are written in
+  the Bitrix24 interface — the API has no method that creates one, and none that deletes a consent.
+- **New node: Bitrix24 AI.** 3 operations: register an AI service of your own, list what is
+  registered, remove one by its code. The node connects the service; Bitrix24 calls it when a person
+  uses AI in a CRM card, a chat or an automation rule.
+- **Only five fields of a log entry can be filtered or sorted** — `id`, `timestampX`, `auditTypeId`,
+  `userId`, `guestId`. A condition on any of the other eight fails the whole call instead of being
+  ignored, and the node now shows which field REST 3.0 refused and why: the field-by-field reasons
+  used to be dropped, leaving only "Error validating request object."
+- **The event log refuses a date with milliseconds**, which is exactly the form a JavaScript date
+  produces. The node cuts them off before the call.
+- `entity.*` (application data storage, 17 methods) and `messageservice.*` (SMS and message
+  providers, 5) got no node: every method of both answers `ACCESS_DENIED Application context
+  required` to a webhook. They wait for the OAuth2 credential of a local application.
+- **CRM → Delivery names the right record types.** It said deliveries belong to deals, invoices and
+  smart process items; the Bitrix24 documentation now says only deals and invoices have them, and
+  Get Many answers an empty list for any other type. Get Many also says why a delivery can be
+  missing from it: system shipments and shipments without a delivery service are left out, while
+  Get by ID reads them.
+- **Tasks → Scrum Task → Update: Backlog or Sprint ID is required for a task not yet in the scrum.**
+  The hint used to say such a task lands in the backlog by itself; the documentation of
+  `tasks.api.scrum.task.update` no longer says so and lists `Entity id not found` for this case.
+- The group picker of Bitrix24 Tasks marks an archived group whether `CLOSED` comes as `Y` or as
+  `true`. The documentation of `socialnetwork.api.workgroup.list` now types it as boolean, while a
+  live portal still answers `Y` and `N`. Filters keep sending `Y` and `N`: with `true` and `false`
+  the same portal selected other groups.
+- Checked on a live portal: all 8 reading operations of the three nodes. Not run: Consent → Create,
+  which writes a record no method removes, and the two AI writes, which need an endpoint of your own
+  and would show the service to everyone on the portal.
+
 ## 0.9.0 — 19.09.2026
 
 - **New node: Bitrix24 Catalog.** 148 operations across 26 resources, one for each of the 145
@@ -21,9 +58,9 @@
   never reaches the output.
 - **Bitrix24 Trigger** lists the 15 catalog events, `CATALOG.PRODUCT.ON.ADD` and the like, which the
   event list extracted from the documentation had missed for their dotted spelling.
-- Checked on a live portal: 140 operations in full and 4 up to the refusal a portal with inventory
-  management off gives. Not run: supplier links, which need a CRM record of the Supplier category,
-  custom field values of documents and reading one markup.
+- Checked on a live portal: 140 operations. Not run through: conducting and cancelling inventory
+  documents, which move stock. Not run: supplier links, which need a CRM record of the Supplier
+  category, custom field values of documents and reading one markup.
 
 ## 0.8.3 — 19.09.2026
 

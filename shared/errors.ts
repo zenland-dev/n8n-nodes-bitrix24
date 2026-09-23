@@ -20,6 +20,8 @@ export interface Bitrix24Failure {
 	code: string;
 	description: string;
 	status: number;
+	/** What REST 3.0 puts in `validation`: which field it refused and why. */
+	details?: string;
 }
 
 /**
@@ -47,6 +49,7 @@ export function readFailure(body: unknown, status: number): Bitrix24Failure | un
 			code: String(nested.code ?? ''),
 			description: String(nested.message ?? nested.description ?? ''),
 			status,
+			details: validationDetails(nested.validation),
 		};
 	}
 
@@ -55,6 +58,25 @@ export function readFailure(body: unknown, status: number): Bitrix24Failure | un
 		description: String(data.error_description ?? ''),
 		status,
 	};
+}
+
+/**
+ * The field-by-field reasons REST 3.0 sends next to a validation error. Without them
+ * the message is only "Error validating request object."; with them it names the field
+ * and what is wrong with it.
+ */
+function validationDetails(validation: unknown): string | undefined {
+	if (!Array.isArray(validation)) return undefined;
+	const lines = validation
+		.map((entry) => {
+			if (entry === null || typeof entry !== 'object') return String(entry ?? '');
+			const item = entry as IDataObject;
+			const field = String(item.field ?? '');
+			const message = String(item.message ?? '');
+			return field === '' ? message : `${field}: ${message}`;
+		})
+		.filter((line) => line !== '');
+	return lines.length === 0 ? undefined : lines.join('; ');
 }
 
 /** What to tell a person, per system code. Method codes fall through to Bitrix24's text. */
@@ -96,9 +118,12 @@ export function toNodeApiError(
 	const text = failure.description !== '' ? failure.description : code || 'Unknown error';
 	const message = code !== '' && code !== text ? `${text} [${code}]` : text;
 
+	const hint = HINTS[code] ?? HINTS[code.toUpperCase()];
+	const description = [failure.details, hint].filter((part) => part !== undefined && part !== '').join(' ');
+
 	return new NodeApiError(node, (body ?? {}) as JsonObject, {
 		message: `Bitrix24 ${method}: ${message}`,
-		description: HINTS[code] ?? HINTS[code.toUpperCase()],
+		description: description === '' ? undefined : description,
 		httpCode: String(failure.status),
 		itemIndex,
 	});

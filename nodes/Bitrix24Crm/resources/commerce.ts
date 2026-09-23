@@ -171,18 +171,23 @@ export const paymentResource: Resource = {
 	],
 };
 
+const deliveryRecord: INodeProperties[] = [
+	entityTypeProperty('Type of the record — deal or invoice. Other types never have deliveries, and Bitrix24 answers them with an empty list'),
+	numberProperty('Record ID', 'entityId', 'ID of that record'),
+];
+
 export const deliveryResource: Resource = {
 	value: 'delivery',
 	name: 'Delivery',
-	description: 'Deliveries (shipments) of deals, invoices and smart process items',
+	description: 'Deliveries (shipments) of deals and invoices',
 	operations: [
 		call('get', 'Get', 'Get a delivery', 'Retrieve a delivery with its price, service and status', 'crm.item.delivery.get', [numberProperty('Delivery ID', 'deliveryId', 'ID of the delivery')], (c, i) => ({ id: idOf('deliveryId', 'Delivery ID')(c, i) })),
 		{
 			value: 'getMany',
 			name: 'Get Many',
 			action: 'Get the deliveries of a record',
-			description: 'List the deliveries of one record. Shipments added outside CRM, through sale.shipment.add, may not be listed; Get by ID still reads them.',
-			properties: [...record, jsonProperty('Filter (JSON)', 'filterJson', 'Extra filter, e.g. {"deducted": "Y"}')],
+			description: 'List all deliveries of one record in a single response. System shipments and shipments without a delivery service are left out; Get by ID still reads them.',
+			properties: [...deliveryRecord, jsonProperty('Filter (JSON)', 'filterJson', 'Extra filter on shipment fields in camelCase, e.g. {"deducted": "Y"}')],
 			async execute(itemIndex) {
 				const params: IDataObject = recordParams(this, itemIndex);
 				const filter = jsonParameter<IDataObject>(this, 'filterJson', itemIndex, {});

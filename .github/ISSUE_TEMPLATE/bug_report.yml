@@ -46,6 +46,9 @@ body:
         - Bitrix24 Business Processes
         - Bitrix24 Lists
         - Bitrix24 Catalog
+        - Bitrix24 Event Log
+        - Bitrix24 Consents
+        - Bitrix24 AI
     validations:
       required: true
 

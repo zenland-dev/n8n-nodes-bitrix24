@@ -511,7 +511,7 @@ export const scrumTaskResource: Resource = {
 					placeholder: 'Add Field',
 					default: {},
 					options: [
-						{ displayName: 'Backlog or Sprint ID', name: 'entityId', type: 'number', default: 0, description: 'Where the task goes. Leave out to keep it; a new scrum task lands in the backlog.' },
+						{ displayName: 'Backlog or Sprint ID', name: 'entityId', type: 'number', default: 0, description: 'Where the task goes. Required when the task is not in the scrum yet; leave out to keep a scrum task where it is.' },
 						{ displayName: 'Epic ID', name: 'epicId', type: 'number', default: 0, description: '0 removes the epic' },
 						{ displayName: 'Sort', name: 'sort', type: 'number', default: 0 },
 						{ displayName: 'Story Points', name: 'storyPoints', type: 'string', default: '', placeholder: '5' },

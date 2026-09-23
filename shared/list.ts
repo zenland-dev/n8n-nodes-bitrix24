@@ -108,3 +108,47 @@ export async function listAll(
 	}
 	return rows;
 }
+
+export interface ListV3Options {
+	/** Where the rows live inside `result`. Every REST 3.0 list method seen so far uses `items`. */
+	itemsKey?: string;
+	/** Stop after this many rows. Undefined means all. */
+	limit?: number;
+	/** Rows per request. Bitrix24 defaults to 50 and served 100 when asked (22.09.2026). */
+	pageSize?: number;
+	itemIndex?: number;
+}
+
+/**
+ * Reads a REST 3.0 list method page by page.
+ *
+ * REST 3.0 pages differently from the classic API: no `next` offset comes back, the
+ * caller asks for `pagination: {page, limit}` and stops when a short page arrives.
+ * The page size stays the same across the whole run — Bitrix24 works the offset out
+ * of `page` and `limit`, so shrinking the limit on the last page would skip rows.
+ */
+export async function listAllV3(
+	this: Bitrix24Context,
+	method: string,
+	params: IDataObject,
+	options: ListV3Options = {},
+): Promise<IDataObject[]> {
+	const pageSize = options.pageSize ?? PAGE_SIZE;
+	const rows: IDataObject[] = [];
+
+	for (let page = 1; page <= MAX_PAGES; page++) {
+		const body = await bitrix24Request.call(
+			this,
+			method,
+			{ ...params, pagination: { page, limit: pageSize } },
+			{ v3: true, itemIndex: options.itemIndex },
+		);
+		const pageRows = extractRows(body.result, options.itemsKey ?? 'items');
+		rows.push(...pageRows);
+
+		if (pageRows.length < pageSize) break;
+		if (options.limit !== undefined && rows.length >= options.limit) break;
+	}
+
+	return options.limit === undefined ? rows : rows.slice(0, options.limit);
+}

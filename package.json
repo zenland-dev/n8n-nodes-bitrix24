@@ -1,7 +1,7 @@
 {
 	"name": "@zenland-dev/n8n-nodes-bitrix24",
-	"version": "0.9.0",
-	"description": "Bitrix24 nodes for n8n: CRM, product catalog with prices, stock and inventory documents, tasks and workgroups, business processes, universal lists, calendar and resource booking, employees and company structure, messenger and open lines, chatbots, Drive files and folders, any REST method, batches, a webhook trigger and polling triggers for chats and bots",
+	"version": "0.10.0",
+	"description": "Bitrix24 nodes for n8n: CRM, product catalog with prices, stock and inventory documents, tasks and workgroups, business processes, universal lists, calendar and resource booking, employees and company structure, messenger and open lines, chatbots, Drive files and folders, the event log, user agreements and consents, your own AI services, any REST method, batches, a webhook trigger and polling triggers for chats and bots",
 	"keywords": [
 		"n8n-community-node-package",
 		"n8n",
@@ -30,7 +30,12 @@
 		"files",
 		"employees",
 		"hr",
-		"time tracking"
+		"time tracking",
+		"event log",
+		"audit",
+		"consent",
+		"agreement",
+		"ai"
 	],
 	"license": "MIT",
 	"homepage": "https://github.com/zenland-dev/n8n-nodes-bitrix24",
@@ -70,14 +75,17 @@
 		],
 		"nodes": [
 			"dist/nodes/Bitrix24/Bitrix24.node.js",
+			"dist/nodes/Bitrix24Ai/Bitrix24Ai.node.js",
 			"dist/nodes/Bitrix24BizProc/Bitrix24BizProc.node.js",
 			"dist/nodes/Bitrix24Calendar/Bitrix24Calendar.node.js",
 			"dist/nodes/Bitrix24Catalog/Bitrix24Catalog.node.js",
 			"dist/nodes/Bitrix24Chatbot/Bitrix24Chatbot.node.js",
 			"dist/nodes/Bitrix24ChatbotTrigger/Bitrix24ChatbotTrigger.node.js",
+			"dist/nodes/Bitrix24Consents/Bitrix24Consents.node.js",
 			"dist/nodes/Bitrix24Crm/Bitrix24Crm.node.js",
 			"dist/nodes/Bitrix24Drive/Bitrix24Drive.node.js",
 			"dist/nodes/Bitrix24Employees/Bitrix24Employees.node.js",
+			"dist/nodes/Bitrix24EventLog/Bitrix24EventLog.node.js",
 			"dist/nodes/Bitrix24Lists/Bitrix24Lists.node.js",
 			"dist/nodes/Bitrix24Messenger/Bitrix24Messenger.node.js",
 			"dist/nodes/Bitrix24MessengerTrigger/Bitrix24MessengerTrigger.node.js",
