@@ -13,8 +13,8 @@ Written from scratch against the official REST documentation
 ([bitrix24/b24restdocs](https://github.com/bitrix24/b24restdocs), read on 14.09.2026). No code
 from any other package.
 
-**Status: 0.10.1.** Every operation of the CRM, tasks, Drive, chatbot, calendar, lists and event log
-nodes was run against a live Bitrix24 portal, 140 of the 148 of the catalog node, 29 of the 32 of the
+**Status: 0.10.2.** Every operation of the CRM, tasks, Drive, chatbot, calendar, lists and event log
+nodes was run against a live Bitrix24 portal, 143 of the 148 of the catalog node, 29 of the 32 of the
 employees node, 57 of the 63 of the messenger node, 14 of the 43 of the open lines node, 7 of the 10 of the business process node, 2 of the 3 of the consents node and
 1 of the 3 of the AI node: reads as they are, writes on objects the test created and deleted. What was
 not run, and why, is under [What was checked](#what-was-checked). Operations that work with a
@@ -961,6 +961,13 @@ add products with **Document Item → Create**, then **Conduct**. **Cancel** tak
 document back. `status` of a document is N for a draft, Y once conducted, C when cancelled. With
 inventory management off, documents and their items can be created, changed and deleted, but
 Conduct and Cancel answer "Inventory management has to be enabled to process inventory objects".
+Suppliers and custom fields work in that mode too.
+
+**Document Supplier → Create** takes a CRM company or contact from the Supplier category: the
+category coded `CATALOG_CONTRACTOR_COMPANY` (or `…_CONTACT`) in **CRM → Category → Get Many**. A
+custom field of documents is made per document type with **CRM → Custom Field Config → Create**,
+module `catalog`, entity `CAT_STORE_DOCUMENT_A` for receipts. **Document Custom Field Value** then
+names it `field` plus the ID that call answered — `field287`, not the `UF_…` code.
 
 ## Bitrix24 Event Log
 
@@ -1348,6 +1355,11 @@ it does.
 **A VAT rate wants its name on every update.** `catalog.vat.update` without `name` answers
 "Required fields: name", even when only the rate changes.
 
+**Custom field values want `documentType` in the field list.** `catalog.userfield.document.list`
+with a field list that lacks it answers "The documentType field is not specified in the select
+parameter". Up to 0.10.1 **Document Custom Field Value → Get Many** passed Fields to Return as
+given and failed this way; the node now adds `documentType` itself.
+
 ### Event log, consents and AI
 
 **A filter on the wrong field of the event log fails the call.** Only `id`, `timestampX`,
@@ -1562,14 +1574,15 @@ objects the run created and deleted, every write read back.
 
 | Bitrix24 Catalog | Operations |
 |---|---|
-| Write, checked | 59 |
+| Write, checked | 62 |
 | Read, checked | 81 |
 | Not run through: conducting and cancelling documents, which move stock | 4 |
-| Not checked | 4 |
+| Not checked | 1 |
 
-Not checked: linking a supplier to a receipt and removing the link, which need a CRM company or
-contact of the Supplier category; setting a custom field of a document, which needs such a field;
-and reading one markup: the API cannot create one to read.
+Linking a supplier to a receipt, removing the link and setting a document's custom field waited
+until 23.09.2026: they need a CRM company of the Supplier category and a custom field of receipts,
+and the run made both, then deleted them. Not checked: reading one markup, since the API cannot
+create one to read.
 
 The event log, consents and AI nodes were checked on 22.09.2026. Every operation of the event log
 node ran — it has no write to run — against the log of a live portal: the field list, a period, the

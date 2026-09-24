@@ -392,7 +392,7 @@ export const documentCustomFieldResource: Resource = {
 				documentTypeProperty,
 				...returnAllProperties('documents'),
 				{ displayName: 'Filter (JSON)', name: 'filterJson', type: 'json', default: '{}', description: 'Filter object, e.g. {"documentId": 12}' },
-				{ displayName: 'Fields to Return', name: 'select', type: 'string', default: '', placeholder: 'documentId, field287', description: 'Comma-separated field names. Leave empty for every one.' },
+				{ displayName: 'Fields to Return', name: 'select', type: 'string', default: '', placeholder: 'documentId, field287', description: 'Comma-separated field names. Leave empty for every one. documentType is always returned.' },
 			],
 			async execute(itemIndex) {
 				const returnAll = this.getNodeParameter('returnAll', itemIndex) as boolean;
@@ -400,7 +400,8 @@ export const documentCustomFieldResource: Resource = {
 				const filter = { ...jsonParameter<IDataObject>(this, 'filterJson', itemIndex, {}), documentType: String(this.getNodeParameter('docType', itemIndex)) };
 				const select = stringList(this.getNodeParameter('select', itemIndex, ''));
 				const params: IDataObject = { filter };
-				if (select.length > 0) params.select = select;
+				// A select without documentType is refused: "The documentType field is not specified in the select parameter".
+				if (select.length > 0) params.select = select.includes('documentType') ? select : ['documentType', ...select];
 				return await listAll.call(this, 'catalog.userfield.document.list', params, { itemsKey: 'documents', limit, itemIndex });
 			},
 		},

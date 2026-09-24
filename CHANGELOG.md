@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.10.2 — 23.09.2026
+
+- **Catalog → Document Custom Field Value → Get Many works with Fields to Return.** Bitrix24 refuses
+  a field list without `documentType` ("The documentType field is not specified in the select
+  parameter"), and the node passed the list as it was typed. It adds `documentType` now. With Fields
+  to Return left empty the operation worked before and is unchanged.
+- **Document Supplier → Create and Delete and Document Custom Field Value → Update ran against a live
+  portal**, on a CRM company of the Supplier category and a custom field of receipts the run made and
+  then deleted. The catalog node now has 143 of its 148 operations checked live. README says where a
+  supplier and a document's custom field come from.
+
 ## 0.10.1 — 23.09.2026
 
 - **Tasks → Scrum Sprint → Create works.** It never did: Bitrix24 refuses a sprint without the user
