@@ -1217,6 +1217,18 @@ Tasks and workgroups:
   2.5 turns `sort` into 3.
 - A group created through the API can come out as a collab with the scrum master dropped. Make a
   scrum in Bitrix24 itself; epics and backlogs work on a collab anyway.
+- The epic list takes field names in upper case in its filter: `GROUP_ID`, `NAME`. A field spelled
+  any other way, `groupId` included, gives an empty list and no error. Up to 0.10.2 Scrum Epic → Get
+  Many sent `groupId`, so with a scrum picked it found nothing.
+- The epic and sprint lists answer neither `next` nor `total`, only pages of 50. Get Many asks for
+  the next 50 while a page comes back full; up to 0.10.2 Return All stopped after the first 50.
+- Scrum Epic → Get with **Include Files** off sends `withFiles: false`. The strings `"false"` and
+  `"N"` still bring the files back.
+- Time is logged only for the person who spent it: the documentation says Bitrix24 refuses any
+  author but the webhook user. **Started At** and **Stopped At** are stored as given and do not
+  change the time spent: an entry of 600 seconds with an hour between them kept 600. A date without
+  an offset is read in the Bitrix24 time zone. Time Entry → Update sends the comment every time, and
+  an empty one clears it.
 - The ID of a message in the task chat is not in the task history; a result from a chat message
   needs the ID from Bitrix24 Messenger → Message → Get Many or from `MESSAGE_ID` of the Task
   Comment Added trigger event.
@@ -1419,6 +1431,11 @@ a hidden scrum made in the Bitrix24 interface, with the webhook user alone in it
 kanban stage, an epic and tasks the run created and deleted. That run found two bugs, fixed in
 0.10.1: Sprint → Create never worked, as Bitrix24 refuses a sprint without its author, and Sprint →
 Get sent the parameter name from the documentation, which the method does not know.
+
+On 26.09.2026, after Bitrix24 rewrote its pages on epics and time entries, a run in the same scrum
+on two epics, a task and two time entries found that Epic → Get Many with a scrum picked found
+nothing, and that Return All on epics and sprints stopped at 50. Both are fixed in 0.11.0, and
+Include Files, Move to Scrum ID and the dates of a time entry were checked there too.
 
 Those runs changed the node before this version: Request to Join refuses a member (Bitrix24
 takes the member out instead), Remove refuses a group owner, Sprint → Create requires start, end

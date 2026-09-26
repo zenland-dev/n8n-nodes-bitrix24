@@ -327,6 +327,17 @@ function entryParams(ctx: IExecuteFunctions, itemIndex: number): IDataObject {
 const secondsProperty: INodeProperties = { displayName: 'Seconds', name: 'seconds', type: 'number', required: true, typeOptions: { minValue: 1 }, default: 3600, description: 'Time spent, in seconds' };
 const commentProperty: INodeProperties = { displayName: 'Comment', name: 'comment', type: 'string', default: '', description: 'What the time was spent on' };
 
+const createdDateOption: INodeProperties = { displayName: 'Created Date', name: 'createdDate', type: 'dateTime', default: '', description: 'When the entry counts as made. Bitrix24 puts the current moment otherwise.' };
+
+/** The date fields of ARFIELDS a time entry takes besides SECONDS and COMMENT_TEXT. */
+function entryDates(o: IDataObject): IDataObject {
+	const fields: IDataObject = {};
+	if (o.createdDate) fields.CREATED_DATE = o.createdDate as string;
+	if (o.dateStart) fields.DATE_START = o.dateStart as string;
+	if (o.dateStop) fields.DATE_STOP = o.dateStop as string;
+	return fields;
+}
+
 export const timeEntryResource: Resource = {
 	value: 'timeEntry',
 	name: 'Time Entry',
@@ -337,12 +348,30 @@ export const timeEntryResource: Resource = {
 			name: 'Create',
 			action: 'Log time on a task',
 			description: 'Record time spent on a task',
-			properties: [taskIdProperty, secondsProperty, commentProperty, numberProperty('User ID', 'userId', 'Whose time it is. 0 means the webhook user.', false)],
+			properties: [
+				taskIdProperty,
+				secondsProperty,
+				commentProperty,
+				numberProperty('User ID', 'userId', 'Whose time it is. 0 means the webhook user, and Bitrix24 refuses anyone else: time is logged only by the person who spent it.', false),
+				{
+					displayName: 'Additional Fields',
+					name: 'additionalFields',
+					type: 'collection',
+					placeholder: 'Add Field',
+					default: {},
+					options: [
+						createdDateOption,
+						{ displayName: 'Started At', name: 'dateStart', type: 'dateTime', default: '', description: 'When the work began' },
+						{ displayName: 'Stopped At', name: 'dateStop', type: 'dateTime', default: '', description: 'When the work ended. Seconds is still what counts as time spent.' },
+					],
+				},
+			],
 			async execute(itemIndex) {
 				const taskId = positiveInt(this, 'taskId', itemIndex, 'Task ID');
 				const fields: IDataObject = { SECONDS: positiveInt(this, 'seconds', itemIndex, 'Seconds'), COMMENT_TEXT: this.getNodeParameter('comment', itemIndex, '') as string };
 				const userId = optionalInt(this.getNodeParameter('userId', itemIndex, 0));
 				if (userId !== undefined) fields.USER_ID = userId;
+				Object.assign(fields, entryDates((this.getNodeParameter('additionalFields', itemIndex, {}) ?? {}) as IDataObject));
 				const body = await bitrix24Request.call(this, 'task.elapseditem.add', { TASKID: taskId, ARFIELDS: fields }, { itemIndex });
 				return { id: body.result as number, taskId };
 			},
@@ -411,10 +440,17 @@ export const timeEntryResource: Resource = {
 			value: 'update',
 			name: 'Update',
 			action: 'Update a time entry',
-			description: 'Change the seconds and comment of a time entry',
-			properties: [taskIdProperty, entryId, secondsProperty, commentProperty],
+			description: 'Change the seconds, comment or creation date of a time entry',
+			properties: [
+				taskIdProperty,
+				entryId,
+				secondsProperty,
+				{ ...commentProperty, hint: 'Sent with every update: leaving it empty clears the comment of the entry' },
+				{ displayName: 'Update Fields', name: 'updateFields', type: 'collection', placeholder: 'Add Field', default: {}, options: [createdDateOption] },
+			],
 			async execute(itemIndex) {
-				const fields = { SECONDS: positiveInt(this, 'seconds', itemIndex, 'Seconds'), COMMENT_TEXT: this.getNodeParameter('comment', itemIndex, '') as string };
+				const fields: IDataObject = { SECONDS: positiveInt(this, 'seconds', itemIndex, 'Seconds'), COMMENT_TEXT: this.getNodeParameter('comment', itemIndex, '') as string };
+				Object.assign(fields, entryDates((this.getNodeParameter('updateFields', itemIndex, {}) ?? {}) as IDataObject));
 				await bitrix24Request.call(this, 'task.elapseditem.update', { ...entryParams(this, itemIndex), ARFIELDS: fields }, { itemIndex });
 				return { id: positiveInt(this, 'entryId', itemIndex, 'Entry ID'), updated: true };
 			},

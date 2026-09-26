@@ -128,7 +128,7 @@ export const sprintResource: Resource = {
 				const group = optionalInt(this.getNodeParameter('groupId', itemIndex, ''));
 				if (group !== undefined) filter.GROUP_ID = group;
 				const params = { filter: { ...filter, ...jsonParameter<IDataObject>(this, 'filterJson', itemIndex, {}) } };
-				return await listAll.call(this, 'tasks.api.scrum.sprint.list', params, { limit, itemIndex });
+				return await listAll.call(this, 'tasks.api.scrum.sprint.list', params, { limit, itemIndex, fullPages: true });
 			},
 		},
 		{
@@ -189,15 +189,30 @@ function epicOptions(forUpdate: boolean): INodeProperties[] {
 	const options: INodeProperties[] = [
 		{ displayName: 'Color', name: 'color', type: 'color', default: '#69DAFC' },
 		{ displayName: 'Description', name: 'description', type: 'string', typeOptions: { rows: 3 }, default: '' },
-		{ displayName: 'Drive File IDs', name: 'files', type: 'string', default: '', placeholder: '101, 102', description: 'Comma-separated Drive files to attach to the epic' },
+		{
+			displayName: 'Drive File IDs',
+			name: 'files',
+			type: 'string',
+			default: '',
+			placeholder: '101, 102',
+			description: forUpdate
+				? 'Comma-separated Drive files to add to those already attached. An empty value detaches every file of the epic.'
+				: 'Comma-separated Drive files to attach to the epic',
+		},
 	];
-	if (forUpdate) options.push({ displayName: 'Name', name: 'name', type: 'string', default: '' });
+	if (forUpdate) {
+		options.push(
+			{ displayName: 'Name', name: 'name', type: 'string', default: '' },
+			{ displayName: 'Move to Scrum ID', name: 'groupId', type: 'number', default: 0, description: 'Move the epic to another scrum. The webhook user needs access to the tasks of both.' },
+		);
+	}
 	return byDisplayName(options);
 }
 
 function epicFields(o: IDataObject): IDataObject {
 	const fields: IDataObject = {};
 	if (o.name !== undefined && o.name !== '') fields.name = o.name as string;
+	if (optionalInt(o.groupId) !== undefined) fields.groupId = Number(o.groupId);
 	if (o.description !== undefined) fields.description = o.description as string;
 	if (o.color !== undefined) fields.color = o.color as string;
 	if (o.files !== undefined) fields.files = stringList(o.files).map((f) => (/^n\d+$/.test(f) ? f : `n${f}`));
@@ -231,9 +246,15 @@ export const epicResource: Resource = {
 			name: 'Get',
 			action: 'Get an epic',
 			description: 'Retrieve one epic',
-			properties: [epicId],
+			properties: [
+				epicId,
+				{ displayName: 'Include Files', name: 'withFiles', type: 'boolean', default: true, description: 'Whether to return the files attached to the epic under files' },
+			],
 			async execute(itemIndex) {
-				const body = await bitrix24Request.call(this, 'tasks.api.scrum.epic.get', { id: positiveInt(this, 'epicId', itemIndex, 'Epic ID') }, { itemIndex });
+				const params: IDataObject = { id: positiveInt(this, 'epicId', itemIndex, 'Epic ID') };
+				// Only a real boolean false turns them off: the strings "false" and "N" count as true.
+				if (this.getNodeParameter('withFiles', itemIndex, true) === false) params.withFiles = false;
+				const body = await bitrix24Request.call(this, 'tasks.api.scrum.epic.get', params, { itemIndex });
 				return rows(body.result);
 			},
 		},
@@ -245,23 +266,30 @@ export const epicResource: Resource = {
 			properties: [
 				{ ...scrumGroup, required: false, hint: 'Only the epics of this scrum. Leave empty for all.' },
 				...returnAllProperties('epics'),
-				{ displayName: 'Filter (JSON)', name: 'filterJson', type: 'json', default: '{}', description: 'Extra filter, e.g. {"%name": "billing"}' },
+				{
+					displayName: 'Filter (JSON)',
+					name: 'filterJson',
+					type: 'json',
+					default: '{}',
+					description: 'Extra filter, e.g. {"%NAME": "billing"}',
+					hint: 'Field names in upper case: NAME, DESCRIPTION, CREATED_BY. Bitrix24 answers an empty list to a field spelled any other way.',
+				},
 			],
 			async execute(itemIndex) {
 				const returnAll = this.getNodeParameter('returnAll', itemIndex) as boolean;
 				const limit = returnAll ? undefined : (this.getNodeParameter('limit', itemIndex) as number);
 				const filter: IDataObject = {};
 				const group = optionalInt(this.getNodeParameter('groupId', itemIndex, ''));
-				if (group !== undefined) filter.groupId = group;
+				if (group !== undefined) filter.GROUP_ID = group;
 				const params = { filter: { ...filter, ...jsonParameter<IDataObject>(this, 'filterJson', itemIndex, {}) } };
-				return await listAll.call(this, 'tasks.api.scrum.epic.list', params, { limit, itemIndex });
+				return await listAll.call(this, 'tasks.api.scrum.epic.list', params, { limit, itemIndex, fullPages: true });
 			},
 		},
 		{
 			value: 'update',
 			name: 'Update',
 			action: 'Update an epic',
-			description: 'Rename an epic or change its description, colour or files',
+			description: 'Rename an epic, change its description, colour or files, or move it to another scrum',
 			properties: [epicId, { displayName: 'Update Fields', name: 'updateFields', type: 'collection', placeholder: 'Add Field', default: {}, options: epicOptions(true) }],
 			async execute(itemIndex) {
 				const params = { id: positiveInt(this, 'epicId', itemIndex, 'Epic ID'), fields: epicFields((this.getNodeParameter('updateFields', itemIndex, {}) ?? {}) as IDataObject) };

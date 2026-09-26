@@ -24,6 +24,12 @@ export interface ListOptions {
 	 * filter field: tasks.task.list filters and sorts by ID but answers with id.
 	 */
 	rowIdKey?: string;
+	/**
+	 * Keep paging while pages come back full, for methods that answer neither `next` nor
+	 * `total` — tasks.api.scrum.epic.list says so in its documentation, sprint.list answers
+	 * the same way. Offsets go up by 50; a `next` in the answer still wins.
+	 */
+	fullPages?: boolean;
 	/** Stop after this many rows. Undefined means all. */
 	limit?: number;
 	v3?: boolean;
@@ -56,7 +62,8 @@ function hasCustomOrder(order: unknown): boolean {
  * Reads a list method page by page.
  *
  * Keyset paging is used when `idField` is given and the caller sets no order;
- * otherwise Bitrix24's own `start`/`next` offsets, which also make it count `total`.
+ * otherwise Bitrix24's own `start`/`next` offsets, which also make it count `total`,
+ * or with `fullPages` offsets of 50 for as long as pages come back full.
  */
 export async function listAll(
 	this: Bitrix24Context,
@@ -96,15 +103,24 @@ export async function listAll(
 	}
 
 	let start: number | undefined = 0;
+	let firstRow = '';
 	for (let page = 0; page < MAX_PAGES && start !== undefined; page++) {
 		const body: IDataObject = await bitrix24Request.call(this, method, { ...params, start }, request);
 		const pageRows = extractRows(body.result, options.itemsKey);
+		if (options.fullPages === true) {
+			// A method that ignores `start` answers the first page again; stop instead of looping.
+			const pageFirst = JSON.stringify(pageRows[0] ?? null);
+			if (page > 0 && pageFirst === firstRow) break;
+			if (page === 0) firstRow = pageFirst;
+		}
 		rows.push(...pageRows);
 
 		if (limit !== undefined && rows.length >= limit) return rows.slice(0, limit);
 
 		const next: number = Number(body.next);
-		start = Number.isFinite(next) && next > start && pageRows.length > 0 ? next : undefined;
+		if (Number.isFinite(next) && next > start && pageRows.length > 0) start = next;
+		else if (options.fullPages === true && pageRows.length >= PAGE_SIZE) start += PAGE_SIZE;
+		else start = undefined;
 	}
 	return rows;
 }

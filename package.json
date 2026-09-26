@@ -1,6 +1,6 @@
 {
 	"name": "@zenland-dev/n8n-nodes-bitrix24",
-	"version": "0.10.2",
+	"version": "0.11.0",
 	"description": "Bitrix24 nodes for n8n: CRM, product catalog with prices, stock and inventory documents, tasks and workgroups, business processes, universal lists, calendar and resource booking, employees and company structure, messenger and open lines, chatbots, Drive files and folders, the event log, user agreements and consents, your own AI services, any REST method, batches, a webhook trigger and polling triggers for chats and bots",
 	"keywords": [
 		"n8n-community-node-package",

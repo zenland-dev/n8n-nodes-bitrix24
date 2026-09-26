@@ -348,16 +348,18 @@ export const recentResource: Resource = {
 			properties: [
 				...returnAllProperties('conversations'),
 				filtersProperty([
-						flag('Only Channels', 'onlyChannel'),
-						flag('Only BitrixGPT Chats', 'onlyCopilot'),
-						flag('Only Unread', 'unreadOnly'),
-						flag('Skip Undistributed Open Channels', 'skipUndistributed'),
-									]),
+					flag('Only Channels', 'onlyChannel'),
+					flag('Only BitrixGPT Chats', 'onlyCopilot'),
+					flag('Only Open Channels', 'onlyOpenLines'),
+					flag('Only Unread', 'unreadOnly'),
+					flag('Skip Undistributed Open Channels', 'skipUndistributed'),
+				]),
 			],
 			async execute(itemIndex) {
 				const returnAll = this.getNodeParameter('returnAll', itemIndex) as boolean;
 				const f = (this.getNodeParameter('filters', itemIndex, {}) ?? {}) as IDataObject;
 				const params = recentFlags(f);
+				if (f.onlyOpenLines !== undefined) params.ONLY_OPENLINES = yn(f.onlyOpenLines);
 				if (f.unreadOnly !== undefined) params.UNREAD_ONLY = yn(f.unreadOnly);
 				if (f.onlyChannel !== undefined) params.ONLY_CHANNEL = yn(f.onlyChannel);
 				if (f.onlyCopilot !== undefined) params.ONLY_COPILOT = yn(f.onlyCopilot);

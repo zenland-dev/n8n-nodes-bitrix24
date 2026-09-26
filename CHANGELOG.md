@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.11.0 — 26.09.2026
+
+- **Tasks → Scrum Epic → Get Many finds the epics of a scrum.** With a scrum picked it answered an
+  empty list: the node filtered by `groupId`, and the epic list takes field names in upper case only,
+  answering `[]` to any other spelling without an error. It filters by `GROUP_ID` now. The example in
+  **Filter (JSON)** said `%name` and is `%NAME`, with a hint about the case.
+- **Return All on Scrum Epic and Scrum Sprint reads past 50.** Both lists answer neither `next` nor
+  `total`, and the node took the missing `next` for the last page. It asks for the next 50 while a
+  page comes back full.
+- **Time Entry → Create, User ID.** The hint offered to log time for someone else. The documentation
+  now says Bitrix24 refuses any author but the webhook user, and the hint says so.
+- New in Time Entry → Create: **Started At**, **Stopped At** and **Created Date**; in Update:
+  **Created Date**. Seconds stays the time spent whatever the start and stop. Update now says that
+  the comment is sent every time, so an empty one clears it.
+- New in Scrum Epic → Get: **Include Files**. Off, the epic comes without its `files` field, the
+  description of the Drive custom field. In Update: **Move to Scrum ID**, and Drive File IDs says that
+  files are added to the attached ones and an empty value detaches them all.
+- New in Messenger → Recent Chat → Get Many: the **Only Open Channels** filter, which Get Changes
+  already had.
+- All of it ran against a live portal, except moving an epic into a different scrum and an open
+  channel filter that returns rows: the filter was accepted and answered an empty list.
+
 ## 0.10.2 — 23.09.2026
 
 - **Catalog → Document Custom Field Value → Get Many works with Fields to Return.** Bitrix24 refuses
