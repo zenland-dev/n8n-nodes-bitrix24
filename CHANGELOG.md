@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.11.1 — 29.09.2026
+
+- **CRM → Product Row → Update no longer resets the price and the quantity.** Price and Quantity
+  defaulted to 0 and 1 and were sent every time, so an update of only a discount, a tax or a name
+  set the row to price 0, quantity 1 and recounted the record's total. Both are text fields on
+  Update now, and an empty one keeps the row's value; Product ID 0 and an empty Product Name keep
+  theirs too, and an update with nothing filled in is refused before any request. A workflow that
+  had a price or a quantity typed in still sends it. One that wanted exactly 0 or 1 left that
+  value unsaved, since it was the default, and needs it typed in again.
+- **Chatbot → Chat → Create writes its First Message.** Bitrix24 ignores the first message given
+  to `imbot.v2.Chat.add`, and its documentation dropped the parameter on 28.09.2026: a chat made
+  with it held the same service lines as one made without. The bot now posts the message right
+  after the chat is created, and its ID comes back as `firstMessageId`.
+- New in Product Row → Add and Update: **Tax Name**, the label of the tax rate. In Get Many:
+  **Filters → Product ID**. In Chatbot → Chat → Create: **Chat Type**, private or open.
+- **Hints that said what Bitrix24 does not do.** Payment → Create said the payment covers the
+  record's products; it is made empty, and rows go in with Add Product. Replace All now says every
+  row comes back under a new ID, even one sent with its `id`, which the documentation says is
+  kept. Add Product and Set Product Quantity say a quantity is whole units: 1.5 was stored as 1
+  without an error.
+- Hints brought in line with the rewritten documentation: Chat → Update needs the bot to own the
+  chat; Chat Member → Add needs the bot in the chat, Remove a manager or the owner; a sprint starts
+  with an unfinished task in it and one sprint at a time; Sprint → Delete sends the tasks to the
+  backlog; the sprint filter, like the epic one, takes field names in upper case; a scrum kanban
+  stage no longer claims its sort must be a multiple of 100.
+- Checked on a live portal, on a deal and a bot the runs made and removed: Update with only a tax
+  name, a discount or a price, Tax Name, the Product ID filter, Replace All with the row's ID,
+  payment quantities, and First Message on two chats with no person in them.
+
 ## 0.11.0 — 26.09.2026
 
 - **Tasks → Scrum Epic → Get Many finds the epics of a scrum.** With a scrum picked it answered an

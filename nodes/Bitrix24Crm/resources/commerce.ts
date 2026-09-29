@@ -55,7 +55,7 @@ export const paymentResource: Resource = {
 	name: 'Payment',
 	description: 'Payments of deals, invoices and smart process items, with their products and deliveries',
 	operations: [
-		call('create', 'Create', 'Create a payment', 'Create a payment for a record, covering its products not yet paid for', 'crm.item.payment.add', record, recordParams),
+		call('create', 'Create', 'Create a payment', 'Create an empty payment for a record. Put its product rows into it with Add Product.', 'crm.item.payment.add', record, recordParams),
 		call('get', 'Get', 'Get a payment', 'Retrieve a payment with its sum, status and payment system', 'crm.item.payment.get', [paymentId], (c, i) => ({ id: idOf('paymentId', 'Payment ID')(c, i) })),
 		{
 			value: 'getMany',
@@ -93,7 +93,15 @@ export const paymentResource: Resource = {
 			[
 				paymentId,
 				numberProperty('Product Row ID', 'rowId', 'ID of the product row of the record'),
-				{ displayName: 'Quantity', name: 'quantity', type: 'number', required: true, default: 1, description: 'How many units of the row the payment covers' },
+				{
+					displayName: 'Quantity',
+					name: 'quantity',
+					type: 'number',
+					required: true,
+					default: 1,
+					description: 'How many units of the row the payment covers',
+					hint: 'Whole units, no more than the part of the row not yet in other payments: Bitrix24 drops a fraction without an error, so 1.5 is stored as 1. A paid payment refuses the change.',
+				},
 			],
 			(c, i) => ({
 				paymentId: idOf('paymentId', 'Payment ID')(c, i),
@@ -107,7 +115,17 @@ export const paymentResource: Resource = {
 			'Change a product quantity in a payment',
 			'Change how many units of a product row a payment covers',
 			'crm.item.payment.product.setQuantity',
-			[numberProperty('Payment Product ID', 'paymentProductId', 'ID of the product entry in the payment'), { displayName: 'Quantity', name: 'quantity', type: 'number', required: true, default: 1 }],
+			[
+				numberProperty('Payment Product ID', 'paymentProductId', 'ID of the product entry in the payment'),
+				{
+					displayName: 'Quantity',
+					name: 'quantity',
+					type: 'number',
+					required: true,
+					default: 1,
+					hint: 'Whole units: Bitrix24 drops a fraction without an error, so 1.5 is stored as 1. All payments together may not cover more of the row than the record has. A paid payment refuses the change.',
+				},
+			],
 			(c, i) => ({ id: idOf('paymentProductId', 'Payment Product ID')(c, i), quantity: Number(c.getNodeParameter('quantity', i)) }),
 		),
 		call(
@@ -123,7 +141,7 @@ export const paymentResource: Resource = {
 			value: 'getProducts',
 			name: 'Get Products',
 			action: 'Get the products of a payment',
-			description: 'List the product entries a payment covers',
+			description: 'List the product entries a payment covers. An entry names what it covers by rowId, a product row of the record, or by entityId, an item of the order behind the payment; one put in by Add Product comes back with entityId.',
 			properties: [paymentId],
 			async execute(itemIndex) {
 				const body = await bitrix24Request.call(this, 'crm.item.payment.product.list', { paymentId: positiveInt(this, 'paymentId', itemIndex, 'Payment ID'), filter: {} }, { itemIndex });

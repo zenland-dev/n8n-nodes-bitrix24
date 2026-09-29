@@ -94,7 +94,7 @@ export const sprintResource: Resource = {
 				};
 				const fields: IDataObject = { groupId: positiveInt(this, 'groupId', itemIndex, 'Scrum'), name: this.getNodeParameter('name', itemIndex) as string, ...sprintFields(o) };
 				// Without createdBy Bitrix24 answers "Unable to add sprint" and names nothing (live portal,
-				// 23.09.2026); the documentation has it only in its examples.
+				// 23.09.2026); the documentation marks it required since 28.09.2026.
 				fields.createdBy ??= await webhookUserId(this, itemIndex);
 				const body = await bitrix24Request.call(this, 'tasks.api.scrum.sprint.add', { fields }, { itemIndex });
 				return rows(body.result);
@@ -119,7 +119,14 @@ export const sprintResource: Resource = {
 			properties: [
 				{ ...scrumGroup, required: false, hint: 'Only the sprints of this scrum. Leave empty for all.' },
 				...returnAllProperties('sprints'),
-				{ displayName: 'Filter (JSON)', name: 'filterJson', type: 'json', default: '{}', description: 'Extra filter, e.g. {"STATUS": "active"}' },
+				{
+					displayName: 'Filter (JSON)',
+					name: 'filterJson',
+					type: 'json',
+					default: '{}',
+					description: 'Extra filter, e.g. {"STATUS": "active"} or {"%NAME": "Release"}',
+					hint: 'Field names in upper case: STATUS, NAME, DATE_START. Bitrix24 answers an empty list to a field spelled any other way.',
+				},
 			],
 			async execute(itemIndex) {
 				const returnAll = this.getNodeParameter('returnAll', itemIndex) as boolean;
@@ -147,7 +154,7 @@ export const sprintResource: Resource = {
 			value: 'delete',
 			name: 'Delete',
 			action: 'Delete a sprint',
-			description: 'Delete a sprint',
+			description: 'Delete a sprint in any status, a completed one too. Its tasks go back to the backlog.',
 			properties: [sprintId],
 			async execute(itemIndex) {
 				const id = positiveInt(this, 'sprintId', itemIndex, 'Sprint ID');
@@ -159,7 +166,8 @@ export const sprintResource: Resource = {
 			value: 'start',
 			name: 'Start',
 			action: 'Start a sprint',
-			description: 'Start a planned sprint',
+			description:
+				'Start a planned sprint that has at least one unfinished task. A scrum runs one sprint at a time, so complete the active one first. Needs the scrum owner, a moderator or an administrator.',
 			properties: [sprintId],
 			async execute(itemIndex) {
 				const body = await bitrix24Request.call(this, 'tasks.api.scrum.sprint.start', { id: positiveInt(this, 'sprintId', itemIndex, 'Sprint ID') }, { itemIndex });
@@ -170,7 +178,7 @@ export const sprintResource: Resource = {
 			value: 'completeActive',
 			name: 'Complete Active Sprint',
 			action: 'Complete the active sprint of a scrum',
-			description: 'Complete the running sprint of a scrum; unfinished tasks go back to the backlog',
+			description: 'Complete the running sprint of a scrum; unfinished tasks go back to the backlog. Needs the scrum owner, a moderator or an administrator.',
 			properties: [scrumGroup],
 			async execute(itemIndex) {
 				const body = await bitrix24Request.call(this, 'tasks.api.scrum.sprint.complete', { id: positiveInt(this, 'groupId', itemIndex, 'Scrum') }, { itemIndex });
@@ -403,8 +411,8 @@ const STAGE_TYPES = [
 function scrumStageOptions(forUpdate: boolean): INodeProperties[] {
 	const options: INodeProperties[] = [
 		{ displayName: 'Color', name: 'color', type: 'color', default: '#00C4FB' },
-		{ displayName: 'Sort', name: 'sort', type: 'number', default: 100, description: 'Position of the column; must be a multiple of 100' },
-		{ displayName: 'Type', name: 'type', type: 'options', default: 'WORK', options: STAGE_TYPES, description: 'A sprint kanban needs one New and one Finish stage' },
+		{ displayName: 'Sort', name: 'sort', type: 'number', default: 100, description: 'Position of the column: columns go in ascending order of it' },
+		{ displayName: 'Type', name: 'type', type: 'options', default: 'WORK', options: STAGE_TYPES, description: 'New, In Progress or Finish. A stage created without a type is In Progress.' },
 	];
 	if (forUpdate) {
 		options.push({ displayName: 'Name', name: 'name', type: 'string', default: '' }, { displayName: 'Sprint ID', name: 'sprintId', type: 'number', default: 0 });
@@ -500,7 +508,7 @@ export const scrumStageResource: Resource = {
 			value: 'removeTask',
 			name: 'Remove Task',
 			action: 'Take a task off a sprint kanban',
-			description: 'Remove a task from the kanban of a sprint',
+			description: 'Remove a task from the kanban of a sprint. It stays in the sprint and does not go back to the backlog.',
 			properties: [sprintIdRequired, numberProperty('Task ID', 'taskId', 'ID of the task')],
 			async execute(itemIndex) {
 				const params = sprintTask(this, itemIndex);

@@ -1173,6 +1173,20 @@ per integration keeps one runaway workflow from blocking the others.
   shipments and shipments without a delivery service, Get by ID does not. Only deals and invoices
   have deliveries; for any other type the list is empty.
 - A payment updates only `paySystemId` and `paid`; anything else answers `Empty fields`.
+- Product Row → Update sends only the fields that are filled in, and Bitrix24 keeps the rest and
+  recounts the record's total. Up to 0.11.0 it sent a price of 0 and a quantity of 1 whenever those
+  two were left alone, so changing only a discount or a tax zeroed the row.
+- Product Row → Replace All writes every row whole: a row without a price costs 0, even with a
+  catalog Product ID. Every row comes back under a new ID. The documentation says a row sent with
+  its `id` keeps it; on a live portal `id` as a number, as a string and `ID` all gave a new row.
+  Update is the way to change a row and keep its ID.
+- The documentation says the product row list filters by `id` and `productId` only, and returns
+  every row of the record for a condition on anything else. **Filters → Product ID** in Get Many
+  uses the one that matters.
+- Payment → Create makes an empty payment: rows are put in with Add Product. A quantity there is in
+  whole units, and Bitrix24 drops a fraction without an error: 1.5 in Add Product and in Set Product
+  Quantity was stored as 1. An entry put in by Add Product lists `entityId`, not `rowId`, and stayed
+  in the payment after Replace All took its row away.
 - A digital workplace created with `typeIds` came back with none attached.
 - A pipeline without its own card layout returns `null`: the built-in layout is not readable.
 - Call lists cannot be deleted through the API.
@@ -1207,9 +1221,14 @@ Tasks and workgroups:
   Toggle Pin answers the new state, `pinned: true` or `false`.
 - A sprint needs start, end and status (`Incorrect dateStart format`, `Incorrect sprint status`
   otherwise) and the user who creates it: without `createdBy` Bitrix24 answers `Unable to add
-  sprint` and names no reason. The documentation shows the field in its examples only. Sprint →
-  Create fills in the user the webhook acts as unless **Created By User ID** says otherwise.
-- `tasks.api.scrum.sprint.get` takes `id`, not the `sprintId` its documentation lists.
+  sprint` and names no reason. Until 28.09.2026 the documentation showed the field in its examples
+  only. Sprint → Create fills in the user the webhook acts as unless **Created By User ID** says
+  otherwise.
+- `tasks.api.scrum.sprint.get` takes `id`. Until 28.09.2026 its documentation listed `sprintId`,
+  which Bitrix24 answers with `Could not find value for parameter {id}`.
+- The documentation says a sprint starts only with at least one unfinished task in it and no
+  other sprint of the scrum active, and that starting and completing need the scrum owner, a
+  moderator or an administrator.
 - A task created in a scrum group lands in the scrum backlog by itself. A task from outside the scrum
   cannot be brought in by Scrum Task → Update: without a backlog or sprint Bitrix24 answers `Entity id
   not found`, and with the backlog of the scrum `ERROR_EMPTY_ENTITY_ID`.
@@ -1217,9 +1236,9 @@ Tasks and workgroups:
   2.5 turns `sort` into 3.
 - A group created through the API can come out as a collab with the scrum master dropped. Make a
   scrum in Bitrix24 itself; epics and backlogs work on a collab anyway.
-- The epic list takes field names in upper case in its filter: `GROUP_ID`, `NAME`. A field spelled
-  any other way, `groupId` included, gives an empty list and no error. Up to 0.10.2 Scrum Epic → Get
-  Many sent `groupId`, so with a scrum picked it found nothing.
+- The epic and sprint lists take field names in upper case in their filters: `GROUP_ID`, `NAME`. A
+  field spelled any other way, `groupId` included, gives an empty list and no error. Up to 0.10.2
+  Scrum Epic → Get Many sent `groupId`, so with a scrum picked it found nothing.
 - The epic and sprint lists answer neither `next` nor `total`, only pages of 50. Get Many asks for
   the next 50 while a page comes back full; up to 0.10.2 Return All stopped after the first 50.
 - Scrum Epic → Get with **Include Files** off sends `withFiles: false`. The strings `"false"` and
@@ -1311,6 +1330,13 @@ Chatbots:
   **Include Built-In Commands** is on.
 - A system line the bot sent (`authorId` 0) cannot be deleted by the bot, and not by the chat owner
   either: `CANT_EDIT_MESSAGE`.
+- Chat → Create answers with `users` holding the bot alone, even when members were added; Chat
+  Member → Get Many lists them. Chat → Update works only in a chat the bot owns, whatever the chat's
+  permission settings say.
+- A first message given to `imbot.v2.Chat.add` is not written: two chats made with and without it
+  held the same two service lines. The documentation dropped the parameter on 28.09.2026. Since
+  0.11.1 **First Message** is posted by the bot right after the chat is made, and its ID comes back
+  as `firstMessageId`; up to 0.11.0 the chat was created without it.
 - The same reaction twice is `REACTION_ALREADY_SET`, not a quiet success.
 - The bot's own edits reach its own queue as Message Edited events, unlike REST edits in the
   messenger queue. The trigger drops them with the other bot events.
@@ -1415,6 +1441,14 @@ On 15.09.2026, after Bitrix24 rebuilt its page on CRM fields, three more runs ch
 page says about writing fields and found three bugs, fixed in 0.4.1. The mapper offered `contacts` and `companies`, which fail on write. Import
 failed whenever phones or emails were given. And the node's own hint said an existing phone could
 be changed through its ID in `fm`, which Bitrix24 ignores: the phone was added a second time.
+
+On 23.09.2026 Bitrix24 rewrote its pages on product rows, and the new line "pass only the fields
+that have to be changed" showed that Product Row → Update reset the price to 0 and the quantity to
+1 whenever those two were left alone. Fixed in 0.11.1 and checked on 29.09.2026 by two runs on a
+deal of their own: Update with only a tax name, only a discount or only a price, Tax Name, the Product ID filter
+of Get Many. The same runs found that Replace All gives every row a new ID whatever the
+documentation says, that a payment quantity loses its fraction, and that Payment → Create makes an
+empty payment, where the node's description had said it covers the record's products.
 
 The tasks node was checked the same way, on tasks, a custom field, workgroups, flows, templates,
 My Plan stages and files the run created and deleted at the end.

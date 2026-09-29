@@ -45,7 +45,7 @@ export const chatResource: Resource = {
 			value: 'create',
 			name: 'Create',
 			action: 'Create a group chat as the bot',
-			description: 'Create a group chat on behalf of the bot, with members and a first message. The bot owns it unless an owner is given.',
+			description: 'Create a group chat on behalf of the bot, with members and a first message the bot posts. The bot owns it unless an owner is given.',
 			properties: [
 				botIdProperty,
 				{
@@ -56,11 +56,36 @@ export const chatResource: Resource = {
 					default: {},
 					options: [
 						{ displayName: 'Avatar Binary Field', name: 'avatarBinary', type: 'string', default: '', placeholder: 'data', description: 'Name of the input binary field holding the chat avatar image' },
+						{
+							displayName: 'Chat Type',
+							name: 'type',
+							type: 'options',
+							default: 'chat',
+							options: [
+								{ name: 'Open', value: 'open', description: 'Any employee can find the chat and join it' },
+								{ name: 'Private', value: 'chat', description: 'Only the people added to it' },
+							],
+						},
 						{ displayName: 'Color', name: 'color', type: 'options', default: 'azure', options: COLOR_OPTIONS },
 						{ displayName: 'Description', name: 'description', type: 'string', typeOptions: { rows: 2 }, default: '' },
-						{ displayName: 'First Message', name: 'message', type: 'string', typeOptions: { rows: 3 }, default: '' },
-						{ displayName: 'Member User IDs', name: 'userIds', type: 'string', default: '', placeholder: '7, 12', description: 'Comma-separated IDs of the people to add' },
-						{ displayName: 'Owner User ID', name: 'ownerId', type: 'number', default: 0, description: 'Who owns the chat. 0 makes the bot the owner, which Add Managers and Set Owner need.' },
+						{
+							displayName: 'First Message',
+							name: 'message',
+							type: 'string',
+							typeOptions: { rows: 3 },
+							default: '',
+							description: 'Posted by the bot right after the chat is created; its ID comes back as firstMessageId',
+							hint: 'Bitrix24 ignores a first message given with the new chat, so the node sends it as a message of its own',
+						},
+						{ displayName: 'Member User IDs', name: 'userIds', type: 'string', default: '', placeholder: '7, 12', description: 'Comma-separated IDs of the people to add. The bot is added by itself.' },
+						{
+							displayName: 'Owner User ID',
+							name: 'ownerId',
+							type: 'number',
+							default: 0,
+							description: 'Who owns the chat. 0 makes the bot the owner, which Update, Add Managers and Set Owner need.',
+							hint: 'Bitrix24 does not check the user: an unknown ID leaves the chat without an owner',
+						},
 						{ displayName: 'Title', name: 'title', type: 'string', default: '' },
 					],
 				},
@@ -69,9 +94,10 @@ export const chatResource: Resource = {
 				const botId = readBotId(this, itemIndex);
 				const o = (this.getNodeParameter('additionalFields', itemIndex, {}) ?? {}) as IDataObject;
 				const fields: IDataObject = {};
-				for (const key of ['title', 'description', 'color', 'message'] as const) {
+				for (const key of ['type', 'title', 'description', 'color'] as const) {
 					if (o[key] !== undefined && o[key] !== '') fields[key] = o[key];
 				}
+				const firstMessage = typeof o.message === 'string' && o.message.trim() !== '' ? o.message : undefined;
 				// userIds, not users: the documentation warns that users is accepted and silently adds nobody.
 				const userIds = o.userIds === undefined ? [] : idList(this, o.userIds, 'Member User IDs', itemIndex);
 				if (userIds.length > 0) fields.userIds = userIds;
@@ -80,7 +106,21 @@ export const chatResource: Resource = {
 				if (avatar !== undefined) fields.avatar = avatar;
 				const body = await botRequest.call(this, 'imbot.v2.Chat.add', { botId, fields }, itemIndex);
 				const result = (body.result ?? {}) as IDataObject;
-				return { ...((result.chat ?? {}) as IDataObject), users: (result.users as IDataObject[] | undefined) ?? [] };
+				const chat: IDataObject = { ...((result.chat ?? {}) as IDataObject), users: (result.users as IDataObject[] | undefined) ?? [] };
+				// `message` of imbot.v2.Chat.add writes nothing: two chats made with and without it held the same
+				// messages (live portal, 29.09.2026), and the documentation dropped it on 28.09.2026.
+				if (firstMessage !== undefined && typeof chat.dialogId === 'string') {
+					try {
+						const sent = await botRequest.call(this, 'imbot.v2.Chat.Message.send', { botId, dialogId: chat.dialogId, fields: { message: firstMessage } }, itemIndex);
+						chat.firstMessageId = Number((sent.result as IDataObject | null)?.id) || null;
+					} catch (error) {
+						throw new NodeOperationError(this.getNode(), `Chat ${chat.dialogId} was created, but its first message was not sent`, {
+							itemIndex,
+							description: `${(error as Error).message}. Send it with Message → Send; running this operation again makes a second chat.`,
+						});
+					}
+				}
+				return chat;
 			},
 		},
 		{
@@ -98,10 +138,10 @@ export const chatResource: Resource = {
 			value: 'update',
 			name: 'Update',
 			action: 'Update a chat as the bot',
-			description: 'Change the title, description, colour or avatar of a chat the bot is in',
+			description: 'Change the title, description, colour or avatar of a group chat the bot owns. Bitrix24 refuses it to a bot that is only a member, whatever the chat permissions say.',
 			properties: [
 				botIdProperty,
-				dialogIdProperty(),
+				dialogIdProperty('The group chat'),
 				{
 					displayName: 'Update Fields',
 					name: 'updateFields',
@@ -109,7 +149,14 @@ export const chatResource: Resource = {
 					placeholder: 'Add Field',
 					default: {},
 					options: [
-						{ displayName: 'Avatar Binary Field', name: 'avatarBinary', type: 'string', default: '', placeholder: 'data', description: 'Name of the input binary field holding the new avatar image' },
+						{
+							displayName: 'Avatar Binary Field',
+							name: 'avatarBinary',
+							type: 'string',
+							default: '',
+							placeholder: 'data',
+							description: 'Name of the input binary field holding the new avatar image. A file that is not an image removes the current avatar.',
+						},
 						{ displayName: 'Color', name: 'color', type: 'options', default: 'azure', options: COLOR_OPTIONS },
 						{ displayName: 'Description', name: 'description', type: 'string', typeOptions: { rows: 2 }, default: '' },
 						{ displayName: 'Title', name: 'title', type: 'string', default: '' },
@@ -225,13 +272,14 @@ export const chatResource: Resource = {
 export const chatMemberResource: Resource = {
 	value: 'chatMember',
 	name: 'Chat Member',
-	description: 'People in a chat the bot administers',
+	description: 'People in a group chat the bot is in',
 	operations: [
 		{
 			value: 'add',
 			name: 'Add',
 			action: 'Add people to a chat of the bot',
-			description: 'Add people to a group chat the bot administers. Missing or inactive users are skipped without an error.',
+			description:
+				'Add people to a group chat the bot is in. Any member may add people unless the chat settings ask for a role. Missing, inactive and present users are skipped without an error. The general chat and chats of workgroups, comments and calls refuse it.',
 			properties: [botIdProperty, dialogIdProperty('The group chat'), userIdsProperty],
 			async execute(itemIndex) {
 				const dialogId = readDialogId(this, itemIndex);
@@ -244,7 +292,8 @@ export const chatMemberResource: Resource = {
 			value: 'remove',
 			name: 'Remove',
 			action: 'Remove a person from a chat of the bot',
-			description: 'Remove a person from a group chat the bot administers. Removing someone who is not there succeeds too.',
+			description:
+				'Remove a person from a group chat where the bot is a manager or the owner. Removing someone who is not there succeeds too; someone added by the sync with the company structure cannot be removed.',
 			properties: [botIdProperty, dialogIdProperty('The group chat'), { displayName: 'User ID', name: 'userId', type: 'number', required: true, default: 0 }],
 			async execute(itemIndex) {
 				const dialogId = readDialogId(this, itemIndex);
