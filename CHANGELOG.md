@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.11.2 — 29.09.2026
+
+- **Bitrix24 AI is listed under Development and Productivity.** Its category was `AI`, which n8n's
+  community package scanner no longer accepts, so the package failed the scan from 0.11.0 on. The
+  node, its operations and its search words are unchanged.
+
 ## 0.11.1 — 29.09.2026
 
 - **CRM → Product Row → Update no longer resets the price and the quantity.** Price and Quantity

@@ -2,7 +2,7 @@
 	"node": "@zenland-dev/n8n-nodes-bitrix24.bitrix24Ai",
 	"nodeVersion": "1.0",
 	"codexVersion": "1.0",
-	"categories": ["AI", "Development"],
+	"categories": ["Development", "Productivity"],
 	"resources": {
 		"credentialDocumentation": [
 			{
