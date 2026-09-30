@@ -198,18 +198,24 @@ Anything the mapper cannot express goes into **Fields (JSON)**, which is merged 
 Clearing a field is done there too: the mapper skips empty inputs rather than sending blanks.
 
 Leads, contacts and companies have a separate **Phones, Emails and Messengers** list. On Update
-it only adds. `crm.item.update` ignores the ID of an existing value in `fm`, and an empty value
-removes nothing, so a phone cannot be changed or deleted through this node. The older
-per-entity methods can, through **Bitrix24 → Method → Call**: `crm.contact.update` (or
-`crm.lead.update`, `crm.company.update`) with
+it only adds. To change or remove an existing value, write `fm` into **Fields (JSON)** as an
+object keyed by the value's ID:
 
 ```json
-{"id": 12, "fields": {"PHONE": [{"ID": 34, "VALUE": "+49 30 1234567"}]}}
+{"fm": {"34": {"typeId": "PHONE", "valueType": "WORK", "value": "+49 30 1234567"}, "35": {"typeId": "EMAIL", "value": ""}}}
 ```
 
-and `"DELETE": "Y"` in place of `VALUE` to remove one. The value IDs are in `fm` of **Get**, and
-of **Get Many** when **Fields to Return** is empty or `*`; with a list of fields Bitrix24 leaves
-`fm` out.
+The first entry changes value 34, the second removes value 35: an empty `value` deletes. Keys
+`n0`, `n1`… add new values, and the list's entries go in under the `n` keys the object leaves
+free. The same `fm` as an array only adds: an `id` inside an array entry is ignored. The value IDs
+are in `fm` of **Get**, and of **Get Many** when **Fields to Return** is empty or `*`; with a list
+of fields Bitrix24 leaves `fm` out.
+
+**Label** takes the values Bitrix24 lists for each kind: work, mobile, home, fax, pager, mailing
+and other for a phone; work, home, mailing and other for an email; work, home, Facebook, VK,
+LiveJournal, Twitter and other for a website; Telegram, WhatsApp, Viber, VK, Facebook, Instagram,
+Bitrix24 Network, Live Chat, Open Channel, Skype and other for a messenger. A label that does not
+fit the kind goes out as Work, or as Telegram for a messenger.
 
 ### Create runs automation, Import does not
 
@@ -545,7 +551,8 @@ more.
 **Move** works within one drive. Moving a file or a folder to another drive answered `false` and
 left it where it was; the node turns that into an error.
 **Copy** worked across drives, a folder with its contents included, so copy and delete the
-original instead.
+original instead. Copy does not rename: when the target folder already has a file or folder of
+that name, Bitrix24 answers `DISK_OBJ_22000` and makes no copy.
 
 **Share With User** gives one person access to a folder. It answered `true` for another user and
 `false` for the webhook user itself.

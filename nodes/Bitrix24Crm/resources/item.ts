@@ -72,11 +72,16 @@ function fieldsMapperProperty(purpose: 'create' | 'update'): INodeProperties {
 	};
 }
 
+/**
+ * Labels per kind, after the VALUE_TYPE table of crm.multifield.fields. A label that does not fit
+ * the kind is sent as the kind's first one. SKYPE is deprecated there: Bitrix24 offers it only
+ * where it was used before. WHATSAPP is not in the table, and Bitrix24 stores it all the same.
+ */
 const VALUE_TYPES: Record<string, string[]> = {
 	PHONE: ['WORK', 'MOBILE', 'HOME', 'FAX', 'PAGER', 'MAILING', 'OTHER'],
 	EMAIL: ['WORK', 'HOME', 'MAILING', 'OTHER'],
-	WEB: ['WORK', 'HOME', 'OTHER'],
-	IM: ['TELEGRAM', 'WHATSAPP', 'VIBER', 'VK', 'SKYPE', 'IMOL', 'OTHER'],
+	WEB: ['WORK', 'HOME', 'FACEBOOK', 'VK', 'LIVEJOURNAL', 'TWITTER', 'OTHER'],
+	IM: ['TELEGRAM', 'WHATSAPP', 'VIBER', 'VK', 'FACEBOOK', 'INSTAGRAM', 'BITRIX24', 'OPENLINE', 'IMOL', 'SKYPE', 'OTHER'],
 };
 
 const communicationsProperty: INodeProperties = {
@@ -87,7 +92,7 @@ const communicationsProperty: INodeProperties = {
 	placeholder: 'Add Contact Detail',
 	default: {},
 	description:
-		'On Update these are added to the ones the record already has: Bitrix24 ignores the ID of an existing value here. To change or remove one, use the Bitrix24 node (Method → Call) with crm.contact.update, crm.lead.update or crm.company.update and the value ID in PHONE, EMAIL, WEB or IM.',
+		'On Update these are added to the ones the record already has. To change or remove one, write fm in Fields (JSON) as an object keyed by the value ID from Get: {"fm": {"34": {"typeId": "PHONE", "valueType": "WORK", "value": "+49 30 1234567"}}} changes it, an empty value removes it. This list is sent along with it.',
 	options: [
 		{
 			displayName: 'Contact Detail',
@@ -117,10 +122,16 @@ const communicationsProperty: INodeProperties = {
 					name: 'valueType',
 					type: 'options',
 					default: 'WORK',
-					description: 'What the value is — work, mobile, Telegram…. Pick one that fits the kind.',
+					description:
+						'What the value is — work, mobile, Telegram…. One that does not fit the kind is sent as Work for a phone, email or website and as Telegram for a messenger.',
 					options: [
+						{ name: 'Bitrix24 Network', value: 'BITRIX24' },
+						{ name: 'Facebook', value: 'FACEBOOK' },
 						{ name: 'Fax', value: 'FAX' },
 						{ name: 'Home', value: 'HOME' },
+						{ name: 'Instagram', value: 'INSTAGRAM' },
+						{ name: 'Live Chat', value: 'OPENLINE' },
+						{ name: 'LiveJournal', value: 'LIVEJOURNAL' },
 						{ name: 'Mailing', value: 'MAILING' },
 						{ name: 'Mobile', value: 'MOBILE' },
 						{ name: 'Open Channel', value: 'IMOL' },
@@ -128,6 +139,7 @@ const communicationsProperty: INodeProperties = {
 						{ name: 'Pager', value: 'PAGER' },
 						{ name: 'Skype', value: 'SKYPE' },
 						{ name: 'Telegram', value: 'TELEGRAM' },
+						{ name: 'Twitter', value: 'TWITTER' },
 						{ name: 'Viber', value: 'VIBER' },
 						{ name: 'VK', value: 'VK' },
 						{ name: 'WhatsApp', value: 'WHATSAPP' },
@@ -170,10 +182,25 @@ function collectFields(ctx: IExecuteFunctions, entityTypeId: number, itemIndex: 
 	}
 
 	const extra = jsonParameter<IDataObject>(ctx, 'fieldsJson', itemIndex, {});
-	if (Array.isArray(extra.fm) && Array.isArray(fields.fm)) {
-		extra.fm = [...(fields.fm as IDataObject[]), ...(extra.fm as IDataObject[])];
+	const listed = fields.fm as IDataObject[] | undefined;
+	if (listed !== undefined && extra.fm !== null && typeof extra.fm === 'object') {
+		extra.fm = Array.isArray(extra.fm) ? [...listed, ...(extra.fm as IDataObject[])] : withNewValues(extra.fm as IDataObject, listed);
 	}
 	return { ...fields, ...extra };
+}
+
+/**
+ * `fm` as an object is keyed by what to do: a value ID changes that value (an empty value removes
+ * it), `n0`, `n1`… add one. The list's entries go in under `n` keys the object does not use yet.
+ */
+function withNewValues(keyed: IDataObject, added: IDataObject[]): IDataObject {
+	const out: IDataObject = {};
+	let n = 0;
+	for (const entry of added) {
+		while (`n${n}` in keyed) n++;
+		out[`n${n++}`] = entry;
+	}
+	return { ...out, ...keyed };
 }
 
 /**
@@ -181,9 +208,10 @@ function collectFields(ctx: IExecuteFunctions, entityTypeId: number, itemIndex: 
  * and takes contact details the older way, one list per kind: PHONE: [{ VALUE, VALUE_TYPE }].
  */
 function importContactDetails(fields: IDataObject): IDataObject {
-	if (!Array.isArray(fields.fm)) return fields;
+	if (fields.fm === null || typeof fields.fm !== 'object') return fields;
 	const { fm, ...rest } = fields;
-	for (const raw of fm as Array<IDataObject | null>) {
+	const entries = (Array.isArray(fm) ? fm : Object.values(fm as IDataObject)) as Array<IDataObject | null>;
+	for (const raw of entries) {
 		const entry = raw ?? {};
 		const kind = String(entry.typeId ?? '').toUpperCase();
 		if (kind === '' || entry.value === undefined || entry.value === null || entry.value === '') continue;

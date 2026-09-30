@@ -141,7 +141,8 @@ export const folderResource: Resource = {
 			value: 'copy',
 			name: 'Copy',
 			action: 'Copy a folder',
-			description: 'Copy a folder with everything in it into another folder, on any drive the webhook user can add to',
+			description:
+				'Copy a folder with everything in it into another folder, on any drive the webhook user can add to. A folder of the same name there stops it: Bitrix24 answers DISK_OBJ_22000.',
 			properties: [folderIdProperty, targetFolderIdProperty],
 			async execute(itemIndex) {
 				const params = { id: folderId(this, itemIndex), targetFolderId: readId(this, 'targetFolderId', itemIndex, 'Target Folder ID') };

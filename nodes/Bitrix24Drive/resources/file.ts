@@ -214,7 +214,8 @@ export const fileResource: Resource = {
 			value: 'copy',
 			name: 'Copy',
 			action: 'Copy a file',
-			description: 'Copy a file into another folder, on any drive the webhook user can add to',
+			description:
+				'Copy a file into another folder, on any drive the webhook user can add to. A file of the same name there stops it: Bitrix24 answers DISK_OBJ_22000 and makes no copy.',
 			properties: [fileIdProperty, targetFolderIdProperty],
 			async execute(itemIndex) {
 				const params = { id: fileId(this, itemIndex), targetFolderId: readId(this, 'targetFolderId', itemIndex, 'Target Folder ID') };

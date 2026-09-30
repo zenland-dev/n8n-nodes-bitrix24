@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.11.3 — 30.09.2026
+
+- **A phone, email or messenger of a lead, contact or company can be changed and removed through
+  the CRM node.** Since 0.4.1 the hint and the README said it could not, and sent users to
+  `crm.contact.update` through Method → Call: `crm.item.update` ignored the ID inside an `fm`
+  array. It takes `fm` as an object keyed by the value ID instead, as its documentation shows:
+  `{"fm": {"34": {"typeId": "PHONE", "valueType": "WORK", "value": "+49 30 1234567"}}}` in
+  Fields (JSON) changes value 34, an empty `value` removes it. Checked on a live portal. The
+  hint and the README now say so.
+- **Phones, Emails and Messengers is no longer dropped next to such an object.** An `fm` object
+  in Fields (JSON) replaced the list's entries; they now go in under the `n0`, `n1`… keys that
+  add a value. Import reads an `fm` object too.
+- **Label offers what Bitrix24 lists for each kind** in the new VALUE_TYPE table of
+  `crm.multifield.fields`: Facebook, VK, LiveJournal and Twitter for a website, where VK used to
+  go out as Work; Facebook, Instagram, Bitrix24 Network and Live Chat for a messenger.
+  All of them were stored as sent on a live portal, and so were WhatsApp and Skype, which the
+  table does not list.
+- **Drive → File and Folder → Copy** say that a file or folder of the same name in the target
+  stops the copy with `DISK_OBJ_22000`, as the documentation now does.
+- No change to any published parameter, operation or credential.
+
 ## 0.11.2 — 29.09.2026
 
 - **Bitrix24 AI is listed under Development and Productivity.** Its category was `AI`, which n8n's
