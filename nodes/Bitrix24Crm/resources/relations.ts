@@ -41,8 +41,14 @@ function linkResource(config: LinkConfig): Resource {
 				properties: [
 					...owner,
 					linkedId,
-					{ displayName: 'Primary', name: 'isPrimary', type: 'boolean', default: false, description: `Whether this ${noun} becomes the primary one` },
-					{ displayName: 'Sort', name: 'sort', type: 'number', default: 0, description: 'Position among the links; 0 leaves it to Bitrix24' },
+					{
+						displayName: 'Primary',
+						name: 'isPrimary',
+						type: 'boolean',
+						default: false,
+						description: `Whether this ${noun} becomes the primary one. The first ${noun} linked to a record is primary anyway. A ${noun} that is already linked keeps its Primary and Sort: change those with Replace All.`,
+					},
+					{ displayName: 'Sort', name: 'sort', type: 'number', default: 0, description: 'Position among the links; 0 puts it after the last one' },
 				],
 				async execute(itemIndex) {
 					const fields = compact({
@@ -50,20 +56,23 @@ function linkResource(config: LinkConfig): Resource {
 						IS_PRIMARY: (this.getNodeParameter('isPrimary', itemIndex) as boolean) ? 'Y' : 'N',
 						SORT: Number(this.getNodeParameter('sort', itemIndex)) || undefined,
 					});
-					await bitrix24Request.call(this, method(this, itemIndex, 'add'), { id: ownerId(this, itemIndex), fields }, { itemIndex });
-					return { linked: true, ...fields };
+					const body = await bitrix24Request.call(this, method(this, itemIndex, 'add'), { id: ownerId(this, itemIndex), fields }, { itemIndex });
+					// false: the link already exists, and Bitrix24 changes nothing in it, Sort and Primary included.
+					if (body.result === false) return { linked: true, alreadyLinked: true, [config.idKey]: fields[config.idKey] };
+					return { linked: true, alreadyLinked: false, ...fields };
 				},
 			},
 			{
 				value: 'remove',
 				name: 'Remove',
 				action: `Unlink a ${noun} from a record`,
-				description: `Remove one ${noun} from the links of a record; the ${noun} itself stays`,
+				description: `Remove one ${noun} from the links of a record; the ${noun} itself stays. If it was the primary one, the next by Sort takes its place.`,
 				properties: [...owner, linkedId],
 				async execute(itemIndex) {
 					const fields = { [config.idKey]: positiveInt(this, 'linkedId', itemIndex, `${noun} ID`) };
-					await bitrix24Request.call(this, method(this, itemIndex, 'delete'), { id: ownerId(this, itemIndex), fields }, { itemIndex });
-					return { unlinked: true, ...fields };
+					const body = await bitrix24Request.call(this, method(this, itemIndex, 'delete'), { id: ownerId(this, itemIndex), fields }, { itemIndex });
+					// false: the record had no such link.
+					return { unlinked: true, wasLinked: body.result !== false, ...fields };
 				},
 			},
 			{
@@ -87,7 +96,7 @@ function linkResource(config: LinkConfig): Resource {
 					jsonProperty(
 						'Links (JSON)',
 						'items',
-						`Array of links, e.g. [{"${config.idKey}": 5, "IS_PRIMARY": "Y"}, {"${config.idKey}": 9, "SORT": 20}]`,
+						`Array of links, e.g. [{"${config.idKey}": 5, "IS_PRIMARY": "Y"}, {"${config.idKey}": 9, "SORT": 20}]. The first with IS_PRIMARY "Y" becomes primary, or else the first one. A link without SORT gets 10, 20, 30… by its place in the array, even one that had its own.`,
 						'[]',
 					),
 				],
@@ -96,6 +105,17 @@ function linkResource(config: LinkConfig): Resource {
 					if (!Array.isArray(items)) {
 						throw new NodeOperationError(this.getNode(), 'Links (JSON) must be an array', { itemIndex });
 					}
+					// Bitrix24 silently skips an entry without a valid ID, so a misspelt key would quietly
+					// unlink that record — or all of them, if no entry is left.
+					items.forEach((entry, index) => {
+						const id = entry !== null && typeof entry === 'object' ? Number((entry as IDataObject)[config.idKey]) : NaN;
+						if (!Number.isInteger(id) || id <= 0) {
+							throw new NodeOperationError(this.getNode(), `Links (JSON): entry ${index + 1} has no ${config.idKey}`, {
+								itemIndex,
+								description: `Every entry needs a positive ${config.idKey}. To unlink every ${noun}, give [] or use Remove All.`,
+							});
+						}
+					});
 					await bitrix24Request.call(this, method(this, itemIndex, 'items.set'), { id: ownerId(this, itemIndex), items }, { itemIndex });
 					return { replaced: true, count: items.length };
 				},

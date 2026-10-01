@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.11.4 — 01.10.2026
+
+- **CRM → Linked Contact and Linked Company → Add tells a new link from an existing one.**
+  Bitrix24 answers `false` when the contact or company is already linked, and then changes
+  nothing in the link, Primary and Sort included. The node ignored the answer and returned the
+  Primary and Sort it had sent, as if they were set. The output now has `alreadyLinked`, and an
+  existing link comes back with its ID only. `linked` stays `true` either way. The Primary hint
+  says that the first link is primary anyway, and that an existing link changes through
+  Replace All.
+- **Remove has `wasLinked`**, `false` when the record had no such link. `unlinked` stays `true`.
+- **Replace All refuses an entry without a positive `CONTACT_ID` or `COMPANY_ID`.** Bitrix24
+  skips such an entry without an error, so a misspelt key unlinked the record, or every record
+  if no entry was left. `[]` still unlinks them all. The hint says how the primary link is chosen
+  and that a link without `SORT` is renumbered 10, 20, 30… by its place in the array.
+- **Tasks → Checklist Item and Template Checklist Item → Update refuse an empty update.** Bitrix24
+  answers success to an empty set of fields or an empty title and changes nothing; the node
+  reported `updated: true`. Both are now refused before the request.
+- **Checklist hints follow the documentation:** a Parent Item ID that is not an item of the task
+  leaves a new item outside every checklist, and on Update the accomplice and auditor lists
+  replace the item's members together.
+- No change to any published parameter, operation or credential.
+
 ## 0.11.3 — 30.09.2026
 
 - **A phone, email or messenger of a lead, contact or company can be changed and removed through

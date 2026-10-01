@@ -1,4 +1,5 @@
 import type { IDataObject, IExecuteFunctions, INodeProperties } from 'n8n-workflow';
+import { NodeOperationError } from 'n8n-workflow';
 
 import { PAGE_SIZE } from '../../../shared/list';
 import { returnAllProperties } from '../../../shared/params';
@@ -13,15 +14,17 @@ const itemId = numberProperty('Item ID', 'itemId', 'ID of the checklist item');
 const templateId = numberProperty('Template ID', 'templateId', 'ID of the task template');
 
 function checklistOptions(forUpdate: boolean): INodeProperties[] {
+	// On update Bitrix24 replaces the item's members as a whole, accomplices and auditors together.
+	const replaces = forUpdate ? '. Replaces the members of the item together with the other list, so give everyone who should stay.' : '';
 	const options: INodeProperties[] = [
-		{ displayName: 'Accomplice User IDs', name: 'accomplices', type: 'string', default: '', placeholder: '12, 34', description: 'Comma-separated users responsible for this item; Bitrix24 also adds them to the task as accomplices' },
-		{ displayName: 'Auditor User IDs', name: 'auditors', type: 'string', default: '', placeholder: '12, 34', description: 'Comma-separated users watching this item; Bitrix24 also adds them to the task as auditors' },
+		{ displayName: 'Accomplice User IDs', name: 'accomplices', type: 'string', default: '', placeholder: '12, 34', description: `Comma-separated users responsible for this item; Bitrix24 also adds them to the task as accomplices${replaces}` },
+		{ displayName: 'Auditor User IDs', name: 'auditors', type: 'string', default: '', placeholder: '12, 34', description: `Comma-separated users watching this item; Bitrix24 also adds them to the task as auditors${replaces}` },
 		{ displayName: 'Important', name: 'important', type: 'boolean', default: true, description: 'Whether the item is marked important' },
 		{ displayName: 'Sort Index', name: 'sortIndex', type: 'number', default: 0, description: 'Lower numbers come first within the list' },
 	];
 	if (forUpdate) {
 		options.push(
-			{ displayName: 'Parent Item ID', name: 'parentId', type: 'number', default: 0, description: 'Move the item under another item or checklist' },
+			{ displayName: 'Parent Item ID', name: 'parentId', type: 'number', default: 0, description: 'Item or checklist of the same task or template to move this item under' },
 			{ displayName: 'Title', name: 'title', type: 'string', default: '' },
 		);
 	} else {
@@ -41,6 +44,18 @@ function checklistFields(ctx: IExecuteFunctions, o: IDataObject, itemIndex: numb
 	for (const id of idList(ctx, o.accomplices, 'Accomplice User IDs', itemIndex)) members[id] = { TYPE: 'A' };
 	for (const id of idList(ctx, o.auditors, 'Auditor User IDs', itemIndex)) members[id] = { TYPE: 'U' };
 	if (Object.keys(members).length > 0) fields.MEMBERS = members;
+	return fields;
+}
+
+// task.checklistitem.update answers success to an empty FIELDS or an empty TITLE and changes
+// nothing, so Update refuses both before the call.
+function checklistUpdateFields(ctx: IExecuteFunctions, itemIndex: number): IDataObject {
+	const o = (ctx.getNodeParameter('updateFields', itemIndex, {}) ?? {}) as IDataObject;
+	if (o.title !== undefined && String(o.title).trim() === '') {
+		throw new NodeOperationError(ctx.getNode(), 'Title is empty', { itemIndex, description: 'Bitrix24 keeps the old title when given an empty one. Fill it in or remove the field.' });
+	}
+	const fields = checklistFields(ctx, o, itemIndex);
+	if (Object.keys(fields).length === 0) throw new NodeOperationError(ctx.getNode(), 'Nothing to update: add at least one field', { itemIndex });
 	return fields;
 }
 
@@ -72,7 +87,7 @@ export const checklistItemResource: Resource = {
 			properties: [
 				taskIdProperty,
 				titleProperty,
-				numberProperty('Parent Item ID', 'parentId', 'Item or checklist to put this item under. 0 creates a new checklist named by Title; empty adds to the first checklist, creating it if needed.', false),
+				numberProperty('Parent Item ID', 'parentId', 'Item or checklist of this task to put this item under. 0 creates a new checklist named by Title; empty adds to the first checklist, creating it if needed. An ID that is not an item of the task leaves the new item outside every checklist.', false),
 				{ displayName: 'Additional Fields', name: 'additionalFields', type: 'collection', placeholder: 'Add Field', default: {}, options: checklistOptions(false) },
 			],
 			async execute(itemIndex) {
@@ -115,8 +130,7 @@ export const checklistItemResource: Resource = {
 			description: 'Rename, reorder, move or reassign a checklist item',
 			properties: [taskIdProperty, itemId, { displayName: 'Update Fields', name: 'updateFields', type: 'collection', placeholder: 'Add Field', default: {}, options: checklistOptions(true) }],
 			async execute(itemIndex) {
-				const o = (this.getNodeParameter('updateFields', itemIndex, {}) ?? {}) as IDataObject;
-				await bitrix24Request.call(this, 'task.checklistitem.update', { ...taskItemParams(this, itemIndex), FIELDS: checklistFields(this, o, itemIndex) }, { itemIndex });
+				await bitrix24Request.call(this, 'task.checklistitem.update', { ...taskItemParams(this, itemIndex), FIELDS: checklistUpdateFields(this, itemIndex) }, { itemIndex });
 				return { id: positiveInt(this, 'itemId', itemIndex, 'Item ID'), updated: true };
 			},
 		},
@@ -233,8 +247,7 @@ export const templateChecklistItemResource: Resource = {
 			description: 'Rename, reorder, move or reassign a checklist item of a template',
 			properties: [templateId, itemId, { displayName: 'Update Fields', name: 'updateFields', type: 'collection', placeholder: 'Add Field', default: {}, options: checklistOptions(true) }],
 			async execute(itemIndex) {
-				const o = (this.getNodeParameter('updateFields', itemIndex, {}) ?? {}) as IDataObject;
-				const params = { ...templateItemParams(this, itemIndex), fields: checklistFields(this, o, itemIndex) };
+				const params = { ...templateItemParams(this, itemIndex), fields: checklistUpdateFields(this, itemIndex) };
 				return checkListItem(await bitrix24Request.call(this, 'tasks.template.checklist.update', params, { itemIndex }));
 			},
 		},
