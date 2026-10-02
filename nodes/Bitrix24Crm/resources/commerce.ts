@@ -259,7 +259,7 @@ export const orderLinkResource: Resource = {
 			'crm.orderentity.add',
 			[numberProperty('Order ID', 'orderId', 'ID of the order'), ...record],
 			(c, i) => ({ fields: { orderId: idOf('orderId', 'Order ID')(c, i), ownerTypeId: idOf('entityTypeId', 'Entity type')(c, i), ownerId: idOf('entityId', 'Record ID')(c, i) } }),
-			'orderEntity',
+			'dealOrder',
 		),
 		call(
 			'delete',

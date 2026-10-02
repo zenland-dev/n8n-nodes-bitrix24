@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.5 — 03.10.2026
+
+- **CRM → Order Link → Create returns the link itself**: `orderId`, `ownerId`, `ownerTypeId`, the
+  same fields Get Many gives. `crm.orderentity.add` answers the link under `dealOrder`, while the
+  node looked for `orderEntity` and passed the whole answer on, so the output was
+  `{"dealOrder": {...}}`. An expression that reads `$json.dealOrder.orderId` now reads
+  `$json.orderId`. Checked on a live portal.
+- No change to any parameter, operation or credential.
+
 ## 0.11.4 — 01.10.2026
 
 - **CRM → Linked Contact and Linked Company → Add tells a new link from an existing one.**
